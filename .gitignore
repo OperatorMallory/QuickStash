@@ -1,0 +1,22 @@
+# Build output
+bin/
+obj/
+out/
+publish/
+artifacts/
+TestResults/
+
+# IDE
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+*.DotSettings.user
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Release zips built locally
+QuickStash-*.zip

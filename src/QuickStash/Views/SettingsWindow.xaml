@@ -1,0 +1,108 @@
+<Window x:Class="QuickStash.Views.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:QuickStash.ViewModels"
+        xmlns:controls="clr-namespace:QuickStash.Views.Controls"
+        mc:Ignorable="d" d:DataContext="{d:DesignInstance vm:SettingsViewModel}"
+        Title="QuickStash settings"
+        Width="400" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" Topmost="True" WindowStartupLocation="CenterScreen"
+        FontFamily="{StaticResource UiFont}" FontSize="12.5"
+        Foreground="{StaticResource TextBrush}"
+        UseLayoutRounding="True" TextOptions.TextFormattingMode="Display">
+
+    <Window.Resources>
+        <Style x:Key="Label" TargetType="TextBlock">
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock" BasedOn="{StaticResource DimText}">
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="23,2,0,0" />
+        </Style>
+    </Window.Resources>
+
+    <Border Background="{StaticResource WindowBrush}" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1" CornerRadius="8">
+        <StackPanel>
+            <!-- Title bar (drag to move) -->
+            <Border Background="{StaticResource PanelBrush}" CornerRadius="8,8,0,0" BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="0,0,0,1" Height="40" MouseLeftButtonDown="OnTitleBarMouseDown">
+                <DockPanel Margin="14,0,8,0">
+                    <Button DockPanel.Dock="Right" Style="{StaticResource IconButton}" Content="&#xE711;" ToolTip="Close" Command="{Binding CancelCommand}" />
+                    <TextBlock Text="SETTINGS" FontWeight="Bold" FontSize="12" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                </DockPanel>
+            </Border>
+
+            <StackPanel Margin="18,14,18,16">
+                <!-- Hotkeys -->
+                <DockPanel Margin="0,0,0,8">
+                    <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Reset to defaults" Command="{Binding ResetHotkeysCommand}" />
+                    <TextBlock Style="{StaticResource SectionHeader}" Text="HOTKEYS" Margin="0" VerticalAlignment="Center" />
+                </DockPanel>
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="170" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource Label}" Text="Open / close overlay" />
+                    <controls:HotkeyBox x:Name="OverlayHotkeyBox" Grid.Column="1" Gesture="{Binding OverlayHotkey}" Padding="8,5" />
+                </Grid>
+                <Grid Margin="0,0,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="170" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource Label}" Text="Unpin all notes" />
+                    <controls:HotkeyBox Grid.Column="1" Gesture="{Binding UnpinAllHotkey}" Padding="8,5" />
+                </Grid>
+                <TextBlock Style="{StaticResource DimText}" Text="Click a box and press the new combination." Margin="0,2,0,0" />
+
+                <!-- Appearance -->
+                <TextBlock Style="{StaticResource SectionHeader}" Text="APPEARANCE" Margin="0,18,0,8" />
+                <DockPanel Margin="0,0,0,10">
+                    <TextBlock DockPanel.Dock="Right" Width="38" TextAlignment="Right" Style="{StaticResource Label}"
+                               Text="{Binding OverlayOpacityPercent, StringFormat={}{0:0}%}" />
+                    <TextBlock Style="{StaticResource Label}" Text="Overlay opacity" Width="128" />
+                    <Slider Minimum="50" Maximum="100" SmallChange="1" LargeChange="5" IsSnapToTickEnabled="True" TickFrequency="1"
+                            Value="{Binding OverlayOpacityPercent}" Margin="8,0" VerticalAlignment="Center" />
+                </DockPanel>
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Right" Width="38" TextAlignment="Right" Style="{StaticResource Label}"
+                               Text="{Binding PinnedOpacityPercent, StringFormat={}{0:0}%}" />
+                    <TextBlock Style="{StaticResource Label}" Text="Pinned note opacity" Width="128" />
+                    <Slider Minimum="20" Maximum="100" SmallChange="1" LargeChange="5" IsSnapToTickEnabled="True" TickFrequency="1"
+                            Value="{Binding PinnedOpacityPercent}" Margin="8,0" VerticalAlignment="Center" />
+                </DockPanel>
+
+                <!-- Behavior -->
+                <TextBlock Style="{StaticResource SectionHeader}" Text="BEHAVIOR" Margin="0,18,0,8" />
+                <CheckBox Content="Capture a screenshot when the overlay opens" IsChecked="{Binding AutoCaptureScreenshot}" />
+                <TextBlock Style="{StaticResource Hint}" Text="The shot is only kept if you attach it to a note." />
+                <CheckBox Content="Hide pinned notes from screenshots and recordings" IsChecked="{Binding HidePinnedFromCapture}" Margin="0,10,0,0" />
+                <TextBlock Style="{StaticResource Hint}" Text="Keeps them out of the auto screenshot, OBS and screen sharing." />
+                <CheckBox Content="Start with Windows" IsChecked="{Binding StartWithWindows}" Margin="0,10,0,0" />
+
+                <!-- Error -->
+                <TextBlock Text="{Binding ErrorMessage}" Foreground="{StaticResource DangerBrush}" TextWrapping="Wrap" Margin="0,14,0,0"
+                           Visibility="{Binding ErrorMessage, Converter={StaticResource NullToVisibility}}" />
+
+                <!-- Footer -->
+                <DockPanel Margin="0,18,0,0">
+                    <Button Style="{StaticResource LinkButton}" Command="{Binding OpenDataFolderCommand}" ToolTip="{Binding DataFolder}" Margin="-6,0,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource IconGlyph}" Text="&#xE8B7;" FontSize="11" Margin="0,0,5,0" />
+                            <TextBlock Text="Open data folder" />
+                        </StackPanel>
+                    </Button>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button Content="Cancel" Command="{Binding CancelCommand}" Margin="0,0,6,0" IsCancel="True" />
+                        <Button Style="{StaticResource AccentButton}" Content="Save" Command="{Binding SaveCommand}" Padding="16,5" />
+                    </StackPanel>
+                </DockPanel>
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>

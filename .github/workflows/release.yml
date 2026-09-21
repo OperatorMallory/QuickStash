@@ -1,0 +1,63 @@
+name: Release
+
+# Push a tag like v0.1.0 to build and publish a GitHub Release with two downloads:
+#   QuickStash-<ver>-win-x64.zip     self-contained single file (no .NET install needed)
+#   QuickStash-<ver>-win-x64-fx.zip  framework-dependent (needs the .NET 8 Desktop Runtime), much smaller
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Version from tag
+        id: version
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}".TrimStart('v')
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Test
+        run: dotnet test --configuration Release
+
+      - name: Publish self-contained
+        run: >
+          dotnet publish src/QuickStash/QuickStash.csproj -c Release -r win-x64 --self-contained true
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:DebugType=none -p:Version=${{ steps.version.outputs.version }}
+          -o out/self-contained
+
+      - name: Publish framework-dependent
+        run: >
+          dotnet publish src/QuickStash/QuickStash.csproj -c Release -r win-x64 --self-contained false
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:DebugType=none -p:Version=${{ steps.version.outputs.version }}
+          -o out/fx
+
+      - name: Zip
+        shell: pwsh
+        run: |
+          $v = "${{ steps.version.outputs.version }}"
+          Copy-Item README.md out/self-contained/
+          Copy-Item README.md out/fx/
+          Compress-Archive -Path out/self-contained/* -DestinationPath "QuickStash-$v-win-x64.zip"
+          Compress-Archive -Path out/fx/* -DestinationPath "QuickStash-$v-win-x64-fx.zip"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: QuickStash ${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          files: |
+            QuickStash-${{ steps.version.outputs.version }}-win-x64.zip
+            QuickStash-${{ steps.version.outputs.version }}-win-x64-fx.zip
