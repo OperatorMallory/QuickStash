@@ -22,6 +22,9 @@ internal sealed class QuickCaptureService
     private readonly Lazy<ToastWindow> _toast = new(() => new ToastWindow());
     private bool _busy;
 
+    /// <summary>Raised after a capture was saved.</summary>
+    public event EventHandler<Note>? Captured;
+
     public QuickCaptureService(ForegroundCaptureService capture, TopicRepository topics, NoteRepository notes, ImageStore images, DataChanges changes)
     {
         _capture = capture;
@@ -59,6 +62,7 @@ internal sealed class QuickCaptureService
 
             Log.Info($"Quick capture saved to {topic.Name} ({path})");
             _toast.Value.Show($"Saved to {topic.Name}", "Screenshot added to your notes", MakeThumbnail(target.Screenshot), target.Window);
+            Captured?.Invoke(this, note);
             return note;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SqliteException)

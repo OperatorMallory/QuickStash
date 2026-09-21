@@ -23,6 +23,9 @@ public sealed class AppSettings
     /// <summary>Hide pinned notes from screenshots and screen recordings/streams (Windows 10 2004+).</summary>
     public bool HidePinnedFromCapture { get; set; } = true;
 
+    /// <summary>The first-run introduction has been finished or skipped.</summary>
+    public bool OnboardingCompleted { get; set; }
+
     // Companion (second-monitor) window, remembered between sessions.
     public bool CompanionOpen { get; set; }
     public string? CompanionBounds { get; set; }

@@ -1,0 +1,373 @@
+<Window x:Class="QuickStash.Views.OnboardingWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="clr-namespace:QuickStash.ViewModels"
+        mc:Ignorable="d" d:DataContext="{d:DesignInstance vm:OnboardingViewModel}"
+        Title="Welcome to QuickStash"
+        Width="720" Height="500"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" ShowInTaskbar="True" WindowStartupLocation="CenterScreen"
+        FontFamily="{StaticResource UiFont}" FontSize="13"
+        Foreground="{StaticResource TextBrush}"
+        UseLayoutRounding="True" TextOptions.TextFormattingMode="Display">
+
+    <Window.Resources>
+        <!-- Keycaps: "Ctrl+Shift+Space" drawn as three keys -->
+        <DataTemplate x:Key="KeyCap">
+            <Border Margin="3,0" Padding="12,6" CornerRadius="6" Background="#2A313B" BorderBrush="#46505C" BorderThickness="1,1,1,3">
+                <TextBlock Text="{Binding}" FontSize="15" FontWeight="SemiBold" />
+            </Border>
+        </DataTemplate>
+        <Style x:Key="KeyCaps" TargetType="ItemsControl">
+            <Setter Property="ItemTemplate" Value="{StaticResource KeyCap}" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="ItemsPanel">
+                <Setter.Value>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" />
+                    </ItemsPanelTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SlideTitle" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,20,0,8" />
+        </Style>
+        <Style x:Key="SlideBody" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="13.5" />
+            <Setter Property="Foreground" Value="{StaticResource TextDimBrush}" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="TextAlignment" Value="Center" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="MaxWidth" Value="520" />
+            <Setter Property="LineHeight" Value="20" />
+        </Style>
+        <Style x:Key="Stage" TargetType="Border">
+            <Setter Property="Height" Value="200" />
+            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+            <Setter Property="CornerRadius" Value="8,8,0,0" />
+            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}" />
+            <Setter Property="BorderThickness" Value="0,0,0,1" />
+            <Setter Property="ClipToBounds" Value="True" />
+        </Style>
+
+        <!-- "Try it now" line that turns into a green tick once it happened -->
+        <Style x:Key="TryIt" TargetType="Border">
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,14,0,0" />
+            <Setter Property="Padding" Value="12,5" />
+            <Setter Property="CornerRadius" Value="12" />
+            <Setter Property="Background" Value="{StaticResource AccentSubtleBrush}" />
+        </Style>
+    </Window.Resources>
+
+    <Border Background="{StaticResource WindowBrush}" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1" CornerRadius="10"
+            MouseLeftButtonDown="OnDragMove">
+        <DockPanel>
+            <!-- Footer: dots + navigation -->
+            <Grid DockPanel.Dock="Bottom" Margin="24,0,24,20" Height="36">
+                <ItemsControl x:Name="Dots" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Command="{Binding DataContext.GoToCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}"
+                                    Cursor="Hand" Focusable="False" Margin="0,0,7,0">
+                                <Button.Template>
+                                    <ControlTemplate TargetType="Button">
+                                        <Ellipse Width="8" Height="8">
+                                            <Ellipse.Fill>
+                                                <MultiBinding Converter="{StaticResource DotBrush}">
+                                                    <Binding />
+                                                    <Binding Path="DataContext.Page" RelativeSource="{RelativeSource AncestorType=Window}" />
+                                                </MultiBinding>
+                                            </Ellipse.Fill>
+                                        </Ellipse>
+                                    </ControlTemplate>
+                                </Button.Template>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="Back" Command="{Binding BackCommand}" Margin="0,0,8,0" Padding="16,6"
+                            Visibility="{Binding IsFirst, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
+                    <Button Content="Open companion window" Command="{Binding OpenCompanionCommand}" Margin="0,0,8,0" Padding="14,6"
+                            Visibility="{Binding IsLast, Converter={StaticResource BoolToVisibility}}" />
+                    <Button Style="{StaticResource AccentButton}" Content="{Binding NextLabel}" Command="{Binding NextCommand}" Padding="22,6"
+                            IsDefault="True" />
+                </StackPanel>
+            </Grid>
+
+            <Grid>
+                <!-- Skip -->
+                <Button Style="{StaticResource LinkButton}" Content="Skip intro" Command="{Binding SkipCommand}" Panel.ZIndex="10"
+                        HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,10,12,0" Foreground="{StaticResource TextDimBrush}"
+                        Visibility="{Binding IsLast, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
+
+                <Grid x:Name="Slides">
+                    <!-- ───────── 1. Welcome ───────── -->
+                    <StackPanel Visibility="{Binding Page, Converter={StaticResource EqualsToVisibility}, ConverterParameter=0}">
+                        <Border Style="{StaticResource Stage}">
+                            <Grid>
+                                <Grid.Background>
+                                    <RadialGradientBrush Center="0.5,0.9" GradientOrigin="0.5,0.9" RadiusX="0.8" RadiusY="1.1">
+                                        <GradientStop Color="#1F3A57" Offset="0" />
+                                        <GradientStop Color="#1E2329" Offset="1" />
+                                    </RadialGradientBrush>
+                                </Grid.Background>
+                                <!-- App mark: blue tile with a note -->
+                                <Border Width="96" Height="96" CornerRadius="22" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Color="#2BAEFF" Offset="0" />
+                                            <GradientStop Color="#0B5EB8" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                    <Canvas Width="52" Height="52">
+                                        <Path Fill="White" Data="M0,0 L36,0 L52,16 L52,52 L0,52 Z" />
+                                        <Path Fill="#B8DDFF" Data="M36,0 L36,16 L52,16 Z" />
+                                        <Rectangle Canvas.Left="9" Canvas.Top="24" Width="34" Height="4" Fill="#1A9FFF" />
+                                        <Rectangle Canvas.Left="9" Canvas.Top="33" Width="34" Height="4" Fill="#1A9FFF" />
+                                        <Rectangle Canvas.Left="9" Canvas.Top="42" Width="22" Height="4" Fill="#1A9FFF" />
+                                    </Canvas>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <TextBlock Style="{StaticResource SlideTitle}" Text="Welcome to QuickStash" />
+                        <TextBlock Style="{StaticResource SlideBody}"
+                                   Text="Notes and screenshots for the game you're playing, without alt-tabbing or waiting for apps to open. Everything is sorted by game automatically." />
+                        <TextBlock Style="{StaticResource SlideBody}" Margin="0,12,0,0" FontSize="12" Foreground="{StaticResource TextFaintBrush}"
+                                   Text="This takes about 30 seconds. QuickStash lives in the system tray next to the clock." />
+                    </StackPanel>
+
+                    <!-- ───────── 2. The overlay ───────── -->
+                    <StackPanel Visibility="{Binding Page, Converter={StaticResource EqualsToVisibility}, ConverterParameter=1}">
+                        <Border Style="{StaticResource Stage}">
+                            <Grid>
+                                <!-- a "game" behind -->
+                                <Rectangle>
+                                    <Rectangle.Fill>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                            <GradientStop Color="#1C3B2A" Offset="0" />
+                                            <GradientStop Color="#2C4F6E" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </Rectangle.Fill>
+                                </Rectangle>
+                                <Path Fill="#15291F" Data="M0,200 L120,110 L200,160 L320,70 L460,170 L560,100 L720,190 L720,200 Z" />
+                                <!-- mini overlay -->
+                                <Border Width="330" Height="150" CornerRadius="6" Background="#EE171A21" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
+                                        VerticalAlignment="Center" HorizontalAlignment="Center">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="20" />
+                                            <RowDefinition />
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="90" />
+                                            <ColumnDefinition />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.ColumnSpan="2" Background="{StaticResource PanelBrush}" CornerRadius="6,6,0,0">
+                                            <TextBlock Text="QUICKSTASH" FontSize="8" FontWeight="Bold" Foreground="{StaticResource AccentBrush}" Margin="8,0" VerticalAlignment="Center" />
+                                        </Border>
+                                        <StackPanel Grid.Row="1" Margin="8,8,4,0">
+                                            <Border Height="14" CornerRadius="2" Background="{StaticResource AccentSubtleBrush}" Margin="0,0,0,5">
+                                                <TextBlock Text="TLD" FontSize="8" Margin="5,0" VerticalAlignment="Center" />
+                                            </Border>
+                                            <Rectangle Height="5" Fill="#3A4450" Margin="4,3,20,5" RadiusX="2" RadiusY="2" />
+                                            <Rectangle Height="5" Fill="#3A4450" Margin="4,3,30,5" RadiusX="2" RadiusY="2" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="4,8,8,0">
+                                            <Border Height="30" CornerRadius="3" Background="{StaticResource InputBrush}" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1">
+                                                <TextBlock Text="Bear cave north of the dam|" FontSize="9" Margin="6,0" VerticalAlignment="Center" />
+                                            </Border>
+                                            <Border Height="22" CornerRadius="3" Background="{StaticResource PanelBrush}" Margin="0,6,0,0" />
+                                            <Border Height="22" CornerRadius="3" Background="{StaticResource PanelBrush}" Margin="0,4,0,0" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <TextBlock Style="{StaticResource SlideTitle}" Text="One key opens your notes over the game" />
+                        <ItemsControl Style="{StaticResource KeyCaps}" ItemsSource="{Binding OverlayHotkey, Converter={StaticResource HotkeyParts}}" />
+                        <TextBlock Style="{StaticResource SlideBody}" Margin="0,12,0,0"
+                                   Text="It opens on the right game's topic with a screenshot ready to attach. Type, press Enter to save, Esc to get back to your game." />
+                        <Border Style="{StaticResource TryIt}">
+                            <Grid>
+                                <TextBlock Text="Try it now: press the keys above" FontSize="12" Foreground="{StaticResource AccentHoverBrush}"
+                                           Visibility="{Binding OverlayTried, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
+                                <TextBlock FontSize="12" Foreground="#34C759" Visibility="{Binding OverlayTried, Converter={StaticResource BoolToVisibility}}">
+                                    <Run Text="&#xE73E;" FontFamily="{StaticResource IconFont}" /><Run Text="  Nice, that's the overlay" />
+                                </TextBlock>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ───────── 3. Quick capture ───────── -->
+                    <StackPanel Visibility="{Binding Page, Converter={StaticResource EqualsToVisibility}, ConverterParameter=2}">
+                        <Border Style="{StaticResource Stage}">
+                            <Grid>
+                                <Rectangle>
+                                    <Rectangle.Fill>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Color="#2B3F55" Offset="0" />
+                                            <GradientStop Color="#1B2A22" Offset="1" />
+                                        </LinearGradientBrush>
+                                    </Rectangle.Fill>
+                                </Rectangle>
+                                <Path Fill="#132019" Data="M0,200 L90,120 L170,150 L300,80 L420,150 L520,110 L720,170 L720,200 Z" />
+                                <!-- camera flash -->
+                                <TextBlock Style="{StaticResource IconGlyph}" Text="&#xE722;" FontSize="56" Foreground="#40FFFFFF" />
+                                <!-- toast -->
+                                <Border Width="230" CornerRadius="6" Background="{StaticResource WindowBrush}" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
+                                        Padding="7" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,18,16">
+                                    <DockPanel>
+                                        <Border Width="64" Height="36" CornerRadius="3" Margin="0,0,9,0">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                                    <GradientStop Color="#2B3F55" Offset="0" />
+                                                    <GradientStop Color="#1B2A22" Offset="1" />
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                        </Border>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock FontSize="11.5" FontWeight="SemiBold">
+                                                <Run Text="&#xE722;" FontFamily="{StaticResource IconFont}" Foreground="{StaticResource AccentBrush}" /><Run Text="  Saved to TLD" />
+                                            </TextBlock>
+                                            <TextBlock Text="Screenshot added to your notes" FontSize="9.5" Foreground="{StaticResource TextDimBrush}" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <TextBlock Style="{StaticResource SlideTitle}" Text="Or just grab a screenshot" />
+                        <ItemsControl Style="{StaticResource KeyCaps}" ItemsSource="{Binding CaptureHotkey, Converter={StaticResource HotkeyParts}}" />
+                        <TextBlock Style="{StaticResource SlideBody}" Margin="0,12,0,0"
+                                   Text="Nothing opens and the game keeps running. The shot is filed under that game, ready to look at or draw on later." />
+                        <Border Style="{StaticResource TryIt}">
+                            <Grid>
+                                <TextBlock Text="Try it now: click any window, then press the keys above" FontSize="12" Foreground="{StaticResource AccentHoverBrush}"
+                                           Visibility="{Binding CaptureTried, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
+                                <TextBlock FontSize="12" Foreground="#34C759" Visibility="{Binding CaptureTried, Converter={StaticResource BoolToVisibility}}">
+                                    <Run Text="&#xE73E;" FontFamily="{StaticResource IconFont}" /><Run Text="  Captured. See the corner of your screen" />
+                                </TextBlock>
+                            </Grid>
+                        </Border>
+                    </StackPanel>
+
+                    <!-- ───────── 4. Draw and pin ───────── -->
+                    <StackPanel Visibility="{Binding Page, Converter={StaticResource EqualsToVisibility}, ConverterParameter=3}">
+                        <Border Style="{StaticResource Stage}">
+                            <Grid>
+                                <!-- a map -->
+                                <Rectangle Fill="#243528" />
+                                <Path Stroke="#2F4534" StrokeThickness="1" Data="M0,40 H720 M0,80 H720 M0,120 H720 M0,160 H720 M90,0 V200 M180,0 V200 M270,0 V200 M360,0 V200 M450,0 V200 M540,0 V200 M630,0 V200" />
+                                <Path Fill="#2E4A6B" Data="M430,0 C420,50 470,90 450,140 C440,170 470,190 460,200 L520,200 C530,160 500,120 520,80 C540,40 500,20 510,0 Z" />
+                                <Ellipse Width="60" Height="40" Fill="#1D2B20" Margin="-260,-40,0,0" />
+                                <Ellipse Width="80" Height="50" Fill="#1D2B20" Margin="140,60,0,0" />
+                                <!-- highlighted route with an arrow -->
+                                <Path Stroke="#80FFD60A" StrokeThickness="12" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      Data="M120,160 C200,150 230,90 320,100 S430,60 480,50" />
+                                <Path Stroke="#FF3B30" StrokeThickness="3" StrokeDashArray="3,2" StrokeStartLineCap="Round"
+                                      Data="M120,160 C200,150 230,90 320,100 S430,60 480,50" />
+                                <Path Fill="#FF3B30" Data="M492,46 L474,42 L480,58 Z" />
+                                <Ellipse Width="12" Height="12" Fill="#FF3B30" Stroke="White" StrokeThickness="2" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="114,154,0,0" />
+                                <!-- pinned card -->
+                                <Border Width="150" CornerRadius="5" Background="#D9171A21" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" Padding="7,5"
+                                        HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,40,20,0">
+                                    <StackPanel>
+                                        <TextBlock FontSize="9" Foreground="{StaticResource TextDimBrush}">
+                                            <Run Text="&#xE718;" FontFamily="{StaticResource IconFont}" Foreground="{StaticResource AccentBrush}" /><Run Text="  TLD" FontWeight="SemiBold" />
+                                        </TextBlock>
+                                        <TextBlock Text="Route to the dam: stay left of the river" FontSize="10" TextWrapping="Wrap" Margin="0,3,0,0" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <TextBlock Style="{StaticResource SlideTitle}" Text="Draw on it, then pin it over the game" />
+                        <TextBlock Style="{StaticResource SlideBody}"
+                                   Text="Use the brush button on any screenshot to mark routes with pen, highlighter and arrows. The pin button keeps a note on top of the game. Pinned notes ignore clicks, so they never get in the way, and you can move or resize them while the overlay is open." />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,12,0,0">
+                            <TextBlock Text="Unpin everything" VerticalAlignment="Center" Foreground="{StaticResource TextFaintBrush}" FontSize="12" Margin="0,0,8,0" />
+                            <ItemsControl Style="{StaticResource KeyCaps}" ItemsSource="{Binding UnpinHotkey, Converter={StaticResource HotkeyParts}}"
+                                          RenderTransformOrigin="0.5,0.5">
+                                <ItemsControl.LayoutTransform>
+                                    <ScaleTransform ScaleX="0.8" ScaleY="0.8" />
+                                </ItemsControl.LayoutTransform>
+                            </ItemsControl>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- ───────── 5. Second monitor + borderless ───────── -->
+                    <StackPanel Visibility="{Binding Page, Converter={StaticResource EqualsToVisibility}, ConverterParameter=4}">
+                        <Border Style="{StaticResource Stage}">
+                            <Grid>
+                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <!-- monitor 1: game -->
+                                    <StackPanel Margin="0,0,24,0">
+                                        <Border Width="210" Height="120" CornerRadius="4" BorderBrush="#46505C" BorderThickness="3">
+                                            <Border.Background>
+                                                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                                    <GradientStop Color="#1C3B2A" Offset="0" />
+                                                    <GradientStop Color="#2C4F6E" Offset="1" />
+                                                </LinearGradientBrush>
+                                            </Border.Background>
+                                            <Grid>
+                                                <Path Fill="#15291F" Data="M0,114 L50,70 L90,90 L140,50 L204,95 L204,114 Z" />
+                                                <TextBlock Text="your game" FontSize="10" Foreground="#A0FFFFFF" Margin="8,6" />
+                                            </Grid>
+                                        </Border>
+                                        <Rectangle Width="40" Height="10" Fill="#46505C" />
+                                        <Rectangle Width="80" Height="4" Fill="#46505C" RadiusX="2" RadiusY="2" />
+                                    </StackPanel>
+                                    <!-- monitor 2: companion -->
+                                    <StackPanel>
+                                        <Border Width="210" Height="120" CornerRadius="4" BorderBrush="#46505C" BorderThickness="3" Background="{StaticResource WindowBrush}">
+                                            <Grid Margin="6">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="50" />
+                                                    <ColumnDefinition />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel>
+                                                    <Border Height="10" CornerRadius="2" Background="{StaticResource AccentSubtleBrush}" Margin="0,0,4,4" />
+                                                    <Rectangle Height="4" Fill="#3A4450" Margin="2,2,10,4" />
+                                                    <Rectangle Height="4" Fill="#3A4450" Margin="2,2,16,4" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="1">
+                                                    <Border Height="34" CornerRadius="2" Background="#243528" Margin="0,0,0,4">
+                                                        <Path Stroke="#FF3B30" StrokeThickness="2" Data="M8,26 C30,24 40,10 70,12 S100,6 120,5" />
+                                                    </Border>
+                                                    <Border Height="14" CornerRadius="2" Background="{StaticResource PanelBrush}" Margin="0,0,0,3" />
+                                                    <Border Height="14" CornerRadius="2" Background="{StaticResource PanelBrush}" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
+                                        <Rectangle Width="40" Height="10" Fill="#46505C" />
+                                        <Rectangle Width="80" Height="4" Fill="#46505C" RadiusX="2" RadiusY="2" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <TextBlock Style="{StaticResource SlideTitle}" Text="Got a second monitor?" />
+                        <TextBlock Style="{StaticResource SlideBody}"
+                                   Text="The companion window keeps your notes open next to the game. It switches to whatever game you're playing and shows new captures as they arrive. Open it any time from the tray icon." />
+                        <Border HorizontalAlignment="Center" Margin="0,14,0,0" Padding="12,7" CornerRadius="6" Background="#1FF0B429" BorderBrush="#66F0B429" BorderThickness="1">
+                            <TextBlock FontSize="12" TextWrapping="Wrap" MaxWidth="520" TextAlignment="Center">
+                                <Run Text="&#xE7BA;" FontFamily="{StaticResource IconFont}" Foreground="#F0B429" /><Run Text="  One thing: set your games to " /><Run Text="Borderless" FontWeight="SemiBold" /><Run Text=" or " /><Run Text="Windowed fullscreen" FontWeight="SemiBold" /><Run Text=". Windows can't draw anything over exclusive fullscreen." />
+                            </TextBlock>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+            </Grid>
+        </DockPanel>
+    </Border>
+</Window>

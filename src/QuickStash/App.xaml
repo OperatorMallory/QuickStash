@@ -12,6 +12,9 @@
             <conv:BoolToVisibilityConverter x:Key="BoolToVisibility" />
             <conv:RelativeTimeConverter x:Key="RelativeTime" />
             <conv:ZeroToVisibilityConverter x:Key="ZeroToVisibility" />
+            <conv:EqualsToVisibilityConverter x:Key="EqualsToVisibility" />
+            <conv:HotkeyPartsConverter x:Key="HotkeyParts" />
+            <conv:DotBrushConverter x:Key="DotBrush" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>

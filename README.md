@@ -36,7 +36,7 @@ Or don't open anything: **one key files a screenshot straight into the game's no
 
 1. Download the latest `QuickStash-x.y.z-win-x64.zip` from the **Releases** page.
 2. Extract it anywhere, for example `C:\Tools\QuickStash`, and run `QuickStash.exe`.
-3. Look for the blue note icon in the system tray. Right-click it for Settings and Exit.
+3. A short introduction walks you through the hotkeys the first time. Afterwards, look for the blue note icon in the system tray. Right-click it for the companion window, Settings, **Show introduction** and Exit.
 
 > **"Windows protected your PC"?** The executable is not code-signed, so Microsoft SmartScreen warns about an unknown publisher. Click **More info → Run anyway**, or build from source.
 
@@ -172,6 +172,19 @@ The overlay and pinned notes are transparent layered windows. For those, WPF rea
 - Tests only: xUnit
 
 There's no Electron, web view or WinForms.
+
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+- **Committers and reviewers:** [@OperatorMallory](https://github.com/OperatorMallory)
+- **Approvers:** [@OperatorMallory](https://github.com/OperatorMallory)
+
+Only release builds produced by this repository's GitHub Actions workflow from tagged commits are signed. Signed downloads are published on the [Releases](https://github.com/OperatorMallory/QuickStash/releases) page.
+
+## Privacy
+
+This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it. All notes, screenshots and settings are stored locally in `%AppData%\QuickStash`. There is no account, telemetry or network access.
 
 ## License
 

@@ -116,11 +116,16 @@ public partial class App : Application
         var failed = RegisterHotkeys(_settings.Current);
         if (failed.Count > 0)
             _tray.ShowBalloon("Hotkey unavailable", $"{string.Join(" and ", failed)} is used by another application. Pick another in Settings.", warning: true);
-        else
+        else if (_settings.Current.OnboardingCompleted)
             _tray.ShowBalloon("QuickStash is running", $"Press {_settings.Current.GetOverlayHotkey()} to open the overlay.");
 
         _pins.RestoreAll();
         if (_settings.Current.CompanionOpen) ShowCompanion(activate: false);
+
+        // First run (or first run of a version with the introduction): walk through the basics.
+        _overlay.Opened += (_, _) => _onboardingViewModel?.MarkOverlayTried();
+        _quickCapture.Captured += (_, _) => _onboardingViewModel?.MarkCaptureTried();
+        if (!_settings.Current.OnboardingCompleted) ShowOnboarding();
 
         // Once startup work is done, hand unused memory back so the tray app idles small.
         var idle = new DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
@@ -232,6 +237,40 @@ public partial class App : Application
         _settings.Save(settings);
     }
 
+    // ───────── First-run introduction ─────────
+
+    private OnboardingWindow? _onboardingWindow;
+    private OnboardingViewModel? _onboardingViewModel;
+
+    private void ShowOnboarding()
+    {
+        if (_onboardingWindow is not null)
+        {
+            _onboardingWindow.Activate();
+            return;
+        }
+        var settings = _settings!.Current;
+        _onboardingViewModel = new OnboardingViewModel(
+            settings.GetOverlayHotkey().ToString(), settings.GetCaptureHotkey().ToString(), settings.GetUnpinAllHotkey().ToString());
+        _onboardingViewModel.Finished += (_, openCompanion) =>
+        {
+            _onboardingWindow?.Close();
+            if (openCompanion) ShowCompanion(activate: true);
+        };
+        _onboardingWindow = new OnboardingWindow(_onboardingViewModel);
+        _onboardingWindow.Closed += (_, _) =>
+        {
+            _onboardingWindow = null;
+            _onboardingViewModel = null;
+            if (_settings.Current.OnboardingCompleted) return;
+            var updated = _settings.Current.Clone();
+            updated.OnboardingCompleted = true; // finished, skipped or closed: don't show it again automatically
+            _settings.Save(updated);
+        };
+        _onboardingWindow.Show();
+        _onboardingWindow.Activate();
+    }
+
     // ───────── Drawing on screenshots ─────────
 
     private readonly Dictionary<long, AnnotationWindow> _drawingWindows = new();
@@ -330,6 +369,7 @@ public partial class App : Application
         menu.Items.Add(MenuItem("Companion window", () => ShowCompanion(activate: true)));
         menu.Items.Add(MenuItem("Unpin all notes", () => _pins!.UnpinAll()));
         menu.Items.Add(MenuItem("Settings…", OpenSettings));
+        menu.Items.Add(MenuItem("Show introduction", ShowOnboarding));
         menu.Items.Add(new Separator());
         menu.Items.Add(MenuItem("Exit", Shutdown));
         return menu;
