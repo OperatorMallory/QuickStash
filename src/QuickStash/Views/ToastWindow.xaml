@@ -1,0 +1,28 @@
+<Window x:Class="QuickStash.Views.ToastWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="QuickStash toast"
+        Width="300" SizeToContent="Height"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True" ShowActivated="False"
+        WindowStartupLocation="Manual" Opacity="0"
+        FontFamily="{StaticResource UiFont}" FontSize="12.5"
+        Foreground="{StaticResource TextBrush}"
+        UseLayoutRounding="True" TextOptions.TextFormattingMode="Display">
+    <Border Background="{StaticResource WindowBrush}" BorderBrush="{StaticResource AccentBrush}" BorderThickness="1"
+            CornerRadius="6" Padding="8">
+        <DockPanel>
+            <Border x:Name="ThumbFrame" DockPanel.Dock="Left" Width="80" Height="45" CornerRadius="3" ClipToBounds="True" Margin="0,0,10,0"
+                    BorderBrush="{StaticResource BorderBrush}" BorderThickness="1">
+                <Image x:Name="Thumb" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+            </Border>
+            <StackPanel VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Style="{StaticResource IconGlyph}" x:Name="Glyph" Text="&#xE722;" FontSize="12" Foreground="{StaticResource AccentBrush}" Margin="0,0,6,0" />
+                    <TextBlock x:Name="TitleText" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                </StackPanel>
+                <TextBlock x:Name="DetailText" Style="{StaticResource DimText}" Margin="0,2,0,0" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+        </DockPanel>
+    </Border>
+</Window>

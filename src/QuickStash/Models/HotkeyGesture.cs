@@ -8,6 +8,7 @@ public readonly record struct HotkeyGesture(ModifierKeys Modifiers, Key Key)
 {
     public static readonly HotkeyGesture DefaultOverlay = new(ModifierKeys.Control | ModifierKeys.Shift, Key.Space);
     public static readonly HotkeyGesture DefaultUnpinAll = new(ModifierKeys.Control | ModifierKeys.Shift, Key.P);
+    public static readonly HotkeyGesture DefaultCapture = new(ModifierKeys.Control, Key.Snapshot);
 
     /// <summary>A usable global hotkey needs at least one modifier and a non-modifier key.</summary>
     public bool IsValid => Modifiers != ModifierKeys.None && Key != Key.None && !IsModifierKey(Key);
@@ -73,6 +74,7 @@ public readonly record struct HotkeyGesture(ModifierKeys Modifiers, Key Key)
         Key.OemPlus => "=",
         Key.OemComma => ",",
         Key.OemPeriod => ".",
+        Key.Snapshot => "PrintScreen",
         _ => key.ToString(),
     };
 
@@ -87,6 +89,11 @@ public readonly record struct HotkeyGesture(ModifierKeys Modifiers, Key Key)
             case "=": key = Key.OemPlus; return true;
             case ",": key = Key.OemComma; return true;
             case ".": key = Key.OemPeriod; return true;
+        }
+        if (text.Equals("PrintScreen", StringComparison.OrdinalIgnoreCase) || text.Equals("PrtSc", StringComparison.OrdinalIgnoreCase))
+        {
+            key = Key.Snapshot;
+            return true;
         }
         if (int.TryParse(text, out _)) return false; // Enum.TryParse would accept raw numbers
         return Enum.TryParse(text, ignoreCase: true, out key) && key != Key.None && !IsModifierKey(key);

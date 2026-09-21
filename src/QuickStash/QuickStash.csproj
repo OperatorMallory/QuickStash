@@ -11,10 +11,11 @@
     <AssemblyName>QuickStash</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Assets\QuickStash.ico</ApplicationIcon>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Product>QuickStash</Product>
     <Description>Lightweight overlay notes for gaming</Description>
-    <Copyright>MIT License</Copyright>
+    <Copyright>Copyright (C) 2026 Bibi. Licensed under GPL-3.0-or-later.</Copyright>
+    <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
     <!-- Smaller, faster startup; we don't need culture-specific formatting beyond the user's locale. -->
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <TieredPGO>true</TieredPGO>

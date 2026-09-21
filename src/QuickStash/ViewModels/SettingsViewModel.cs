@@ -24,6 +24,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
         _overlayHotkey = current.OverlayHotkey;
         _unpinAllHotkey = current.UnpinAllHotkey;
+        _captureHotkey = current.CaptureHotkey;
         _overlayOpacityPercent = Math.Round(current.OverlayOpacity * 100);
         _pinnedOpacityPercent = Math.Round(current.PinnedOpacity * 100);
         _startWithWindows = startWithWindows;
@@ -37,6 +38,7 @@ public sealed partial class SettingsViewModel : ObservableObject
 
     [ObservableProperty] private string _overlayHotkey;
     [ObservableProperty] private string _unpinAllHotkey;
+    [ObservableProperty] private string _captureHotkey;
     [ObservableProperty] private double _overlayOpacityPercent;
     [ObservableProperty] private double _pinnedOpacityPercent;
     [ObservableProperty] private bool _startWithWindows;
@@ -47,16 +49,21 @@ public sealed partial class SettingsViewModel : ObservableObject
     partial void OnOverlayOpacityPercentChanged(double value) => _preview(Build());
     partial void OnPinnedOpacityPercentChanged(double value) => _preview(Build());
 
-    private AppSettings Build() => new()
+    // Start from the current settings so values not shown here (e.g. companion window layout) are kept.
+    private AppSettings Build()
     {
-        OverlayHotkey = OverlayHotkey,
-        UnpinAllHotkey = UnpinAllHotkey,
-        OverlayOpacity = OverlayOpacityPercent / 100.0,
-        PinnedOpacity = PinnedOpacityPercent / 100.0,
-        StartWithWindows = StartWithWindows,
-        AutoCaptureScreenshot = AutoCaptureScreenshot,
-        HidePinnedFromCapture = HidePinnedFromCapture,
-    };
+        var settings = _original.Clone();
+        settings.OverlayHotkey = OverlayHotkey;
+        settings.UnpinAllHotkey = UnpinAllHotkey;
+        settings.CaptureHotkey = CaptureHotkey;
+        settings.OverlayOpacity = OverlayOpacityPercent / 100.0;
+        settings.PinnedOpacity = PinnedOpacityPercent / 100.0;
+        settings.StartWithWindows = StartWithWindows;
+        settings.AutoCaptureScreenshot = AutoCaptureScreenshot;
+        settings.HidePinnedFromCapture = HidePinnedFromCapture;
+        return settings;
+    }
+
 
     /// <summary>True once the settings were applied; otherwise closing the window reverts the preview.</summary>
     public bool IsSaved { get; private set; }
@@ -81,6 +88,7 @@ public sealed partial class SettingsViewModel : ObservableObject
     {
         OverlayHotkey = HotkeyGesture.DefaultOverlay.ToString();
         UnpinAllHotkey = HotkeyGesture.DefaultUnpinAll.ToString();
+        CaptureHotkey = HotkeyGesture.DefaultCapture.ToString();
     }
 
     [RelayCommand]

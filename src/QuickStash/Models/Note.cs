@@ -10,9 +10,28 @@ public sealed class Note
     /// <summary>Path relative to the data folder (e.g. "images\2025….png"), or null.</summary>
     public string? ImagePath { get; set; }
 
+    /// <summary>When the image has a drawing on it: the untouched screenshot (ImagePath is then the drawn-on copy).</summary>
+    public string? OriginalImagePath { get; set; }
+
+    /// <summary>When the image has a drawing on it: the saved ink strokes (.isf), so the drawing stays editable.</summary>
+    public string? AnnotationPath { get; set; }
+
     public bool IsPinned { get; set; }
     public double? PinX { get; set; }
     public double? PinY { get; set; }
+
+    /// <summary>Width of the pinned window in device-independent pixels, or null for the default.</summary>
+    public double? PinWidth { get; set; }
+
+    public bool HasDrawing => AnnotationPath is not null;
+
+    /// <summary>Every file this note owns, for cleanup on delete.</summary>
+    public IEnumerable<string> Files()
+    {
+        if (ImagePath is not null) yield return ImagePath;
+        if (OriginalImagePath is not null) yield return OriginalImagePath;
+        if (AnnotationPath is not null) yield return AnnotationPath;
+    }
     public DateTime CreatedAt { get; init; }
     public DateTime UpdatedAt { get; set; }
 

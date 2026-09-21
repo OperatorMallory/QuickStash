@@ -58,6 +58,14 @@
                     <TextBlock Style="{StaticResource Label}" Text="Unpin all notes" />
                     <controls:HotkeyBox Grid.Column="1" Gesture="{Binding UnpinAllHotkey}" Padding="8,5" />
                 </Grid>
+                <Grid Margin="0,2,0,4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="170" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Style="{StaticResource Label}" Text="Quick capture to notes" ToolTip="Screenshot the game into its topic without opening anything" />
+                    <controls:HotkeyBox Grid.Column="1" Gesture="{Binding CaptureHotkey}" Padding="8,5" />
+                </Grid>
                 <TextBlock Style="{StaticResource DimText}" Text="Click a box and press the new combination." Margin="0,2,0,0" />
 
                 <!-- Appearance -->

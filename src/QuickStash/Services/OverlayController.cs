@@ -49,6 +49,7 @@ internal sealed class OverlayController
         // Detect + capture BEFORE the overlay appears, so it is never part of the screenshot.
         ForegroundInfo foreground = _capture.Capture(_autoCapture());
         _viewModel.Prepare(foreground);
+        _viewModel.IsLive = true;
 
         _window.ShowCentered(foreground.Window);
         Opened?.Invoke(this, EventArgs.Empty);
@@ -61,6 +62,7 @@ internal sealed class OverlayController
     {
         if (!IsOpen) return;
         _window.Hide();
+        _viewModel.IsLive = false;
         _viewModel.OnHidden();
         Closed?.Invoke(this, EventArgs.Empty);
 

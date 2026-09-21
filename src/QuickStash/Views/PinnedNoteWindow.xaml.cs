@@ -17,6 +17,8 @@ public partial class PinnedNoteWindow : Window
     private IntPtr _hwnd;
     private bool _interactive;
     private bool _dragging;
+    private bool _resizing;
+    private double _resizeStartWidth;
     private NativeMethods.POINT _dragStartCursor;
     private NativeMethods.RECT _dragStartWindow;
 
@@ -36,7 +38,15 @@ public partial class PinnedNoteWindow : Window
     /// <summary>Raised after the user finished dragging, with the new top-left (physical pixels).</summary>
     public event EventHandler<(int X, int Y)>? Moved;
 
+    /// <summary>Raised after the user finished resizing, with the new width in device-independent pixels.</summary>
+    public event EventHandler<double>? Resized;
+
+    public const double MaxPinWidth = 1600;
+
     public bool ExcludeFromCapture { get; set; } = true;
+
+    /// <summary>Physical pixels per device-independent pixel for the monitor this window is on.</summary>
+    public double DpiScale => _hwnd == IntPtr.Zero ? 1.0 : NativeMethods.GetDpiForWindow(_hwnd) / 96.0;
 
     private void OnSourceInitialized(object? sender, EventArgs e)
     {
@@ -106,6 +116,8 @@ public partial class PinnedNoteWindow : Window
         if (!_interactive || e.OriginalSource is DependencyObject source && IsInsideButton(source)) return;
         NativeMethods.GetCursorPos(out _dragStartCursor);
         NativeMethods.GetWindowRect(_hwnd, out _dragStartWindow);
+        _resizing = ResizeGrip.IsMouseOver;
+        _resizeStartWidth = ActualWidth;
         _dragging = CaptureMouse();
         e.Handled = true;
     }
@@ -114,6 +126,12 @@ public partial class PinnedNoteWindow : Window
     {
         if (!_dragging) return;
         NativeMethods.GetCursorPos(out var cursor);
+        if (_resizing)
+        {
+            double scale = NativeMethods.GetDpiForWindow(_hwnd) / 96.0;
+            Width = Math.Clamp(_resizeStartWidth + (cursor.X - _dragStartCursor.X) / scale, MinWidth, MaxPinWidth);
+            return;
+        }
         MoveTo(_dragStartWindow.Left + cursor.X - _dragStartCursor.X, _dragStartWindow.Top + cursor.Y - _dragStartCursor.Y);
     }
 
@@ -128,6 +146,12 @@ public partial class PinnedNoteWindow : Window
     {
         if (!_dragging) return;
         _dragging = false;
+        if (_resizing)
+        {
+            _resizing = false;
+            if (Math.Abs(ActualWidth - _resizeStartWidth) > 0.5) Resized?.Invoke(this, ActualWidth);
+            return;
+        }
         var (x, y, _, _) = GetBounds();
         if (x != _dragStartWindow.Left || y != _dragStartWindow.Top) Moved?.Invoke(this, (x, y));
     }

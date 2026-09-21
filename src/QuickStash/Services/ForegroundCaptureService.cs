@@ -24,10 +24,16 @@ internal sealed class ForegroundCaptureService
         "NotifyIconOverflowWindow", "TopLevelWindowForOverflowXamlIsland", "Windows.UI.Core.CoreWindow",
     };
 
-    public ForegroundInfo Capture(bool includeScreenshot)
+    /// <summary>Describes (and optionally captures) whatever window is in front right now.</summary>
+    public ForegroundInfo Capture(bool includeScreenshot) => Describe(NativeMethods.GetForegroundWindow(), includeScreenshot);
+
+    /// <summary>
+    /// Describes (and optionally captures) a specific window, e.g. the game the companion window last saw in front.
+    /// Returns <see cref="ForegroundInfo.None"/> for shell windows, QuickStash's own windows, or windows that are gone.
+    /// </summary>
+    public ForegroundInfo Describe(IntPtr hwnd, bool includeScreenshot)
     {
-        IntPtr hwnd = NativeMethods.GetForegroundWindow();
-        if (!IsCandidate(hwnd)) return ForegroundInfo.None;
+        if (!NativeMethods.IsWindow(hwnd) || !IsCandidate(hwnd)) return ForegroundInfo.None;
 
         NativeMethods.GetWindowThreadProcessId(hwnd, out uint pid);
         if (pid == 0 || pid == Environment.ProcessId) return ForegroundInfo.None;
@@ -37,7 +43,7 @@ internal sealed class ForegroundCaptureService
         if (includeScreenshot)
         {
             var stopwatch = Stopwatch.StartNew();
-            screenshot = CaptureWindow(hwnd);
+            screenshot = WithOwnWindowsExcluded(() => CaptureWindow(hwnd));
             Log.Info($"Captured {processName} {screenshot?.PixelWidth}x{screenshot?.PixelHeight} in {stopwatch.ElapsedMilliseconds} ms");
         }
         return new ForegroundInfo(hwnd, processName, screenshot);
@@ -68,6 +74,30 @@ internal sealed class ForegroundCaptureService
     {
         name = name.Trim().ToLowerInvariant();
         return name.EndsWith(".exe", StringComparison.Ordinal) ? name : name + ".exe";
+    }
+
+    /// <summary>
+    /// The screen copy grabs whatever is visible where the game is. If one of our own windows overlaps it (e.g. the
+    /// companion window on the same monitor), briefly exclude our windows from capture so the shot shows the game.
+    /// </summary>
+    private static T WithOwnWindowsExcluded<T>(Func<T> capture)
+    {
+        var changed = new List<IntPtr>();
+        // Every visible window we own, including tooltip/menu popups (a tooltip over the game would end up in the shot).
+        foreach (IntPtr handle in NativeMethods.GetOwnVisibleWindows())
+        {
+            if (NativeMethods.GetWindowDisplayAffinity(handle, out uint affinity) && affinity != NativeMethods.WDA_NONE) continue;
+            if (NativeMethods.SetWindowDisplayAffinity(handle, NativeMethods.WDA_EXCLUDEFROMCAPTURE)) changed.Add(handle);
+        }
+        try
+        {
+            if (changed.Count > 0) NativeMethods.DwmFlush(); // let the compositor drop our windows from the next frame
+            return capture();
+        }
+        finally
+        {
+            foreach (var handle in changed) NativeMethods.SetWindowDisplayAffinity(handle, NativeMethods.WDA_NONE);
+        }
     }
 
     private static BitmapSource? CaptureWindow(IntPtr hwnd)

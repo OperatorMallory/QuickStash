@@ -2,6 +2,8 @@
 
 A lightweight overlay for taking notes while you game. Press a hotkey and a note box pops up over your game, already on the right topic, with a screenshot of the moment ready to attach. Type, press Enter, press Esc, and you're back in the game.
 
+Or don't open anything: **one key files a screenshot straight into the game's notes**. Open it later on your second monitor, draw your route on the map, and pin it over the game.
+
 <!-- TODO: add a short GIF here: hotkey → type → Enter → pin → back to game -->
 
 ## Features
@@ -10,8 +12,17 @@ A lightweight overlay for taking notes while you game. Press a hotkey and a note
 - **Automatic topics.** A topic such as "TLD" can be linked to a game's executable (`tld.exe`). The linked topic is selected automatically when you open the overlay over that game. For a game it hasn't seen yet, it offers to create a topic.
 - **Screenshot on open.** The game window is captured just before the overlay appears. The screenshot is attached to your note if you keep the Attach box ticked, and discarded otherwise. `Ctrl+V` pastes any image from the clipboard instead.
 - **Plain-text notes.** Enter saves and Shift+Enter adds a new line. Notes are listed newest first with thumbnails, and they expand, edit, delete and open images at full size.
+- **Quick capture** (`Ctrl+PrintScreen`). One keypress screenshots the game into its topic and shows a small "Saved to TLD" toast. Nothing opens and the game keeps focus. The first capture in a new game creates and links its topic automatically.
+- **Draw on screenshots.** Pen, highlighter, arrow and eraser, 6 colors, 3 sizes, and undo/redo, for marking routes on a map or circling a loot spot. The original screenshot is always kept, and the drawing stays editable.
+- **Companion window** for a second monitor. A normal resizable window with the same notes. It follows the game you're playing, updates live when you quick-capture, and has a **Capture game** button that screenshots the game even while the companion has focus.
 - **Search across all topics** as you type (`Ctrl+F`).
-- **Pinned notes.** A pinned note is a small, semi-transparent, click-through card that stays on top of the game. While the overlay is open you can drag it. It is restored where you left it after a restart. `Ctrl+Shift+P` unpins everything.
+- **One notes UI, two windows.** `NotesView` is a UserControl hosted by both the overlay (topmost, hides on focus loss) and the companion window (normal, resizable, `WindowChrome` for native snap/resize). Each gets its own `OverlayViewModel`. A tiny `DataChanges` notifier lets whichever one writes (or a quick capture, or a drawing) tell the other to refresh.
+
+**Quick capture and the companion.** `ForegroundWatcher` listens for foreground changes with an out-of-context `SetWinEventHook` and remembers the last non-QuickStash window. That's how the companion's Capture button and the hotkey still capture the game when a QuickStash window has focus. During any capture, QuickStash's own windows (including tooltips) are briefly excluded from screen capture and the compositor is flushed (`DwmFlush`), so an overlapping companion window never ends up in the shot.
+
+**Drawing.** `AnnotationWindow` hosts a WPF `InkCanvas` over the screenshot at its true pixel size inside a `Viewbox`, so strokes are recorded in image pixels. An arrow is a single stroke (shaft plus two barbs), so it undoes and erases as one item. `DrawingService` saves the drawing as a flattened PNG (rendered with `RenderTargetBitmap`) and as ink strokes. The note keeps `OriginalImagePath`, so **Revert to original** is always possible.
+
+**Pinned notes.** A pinned note is a semi-transparent, click-through card that stays on top of the game. While the overlay is open you can drag it and resize it from the corner, so a marked-up map can become a large always-on-top minimap. It is restored with the same position and size after a restart. `Ctrl+Shift+P` unpins everything.
 - **Small footprint.** It runs as a tray icon and uses no GPU (see [Why software rendering](#why-software-rendering)). While idle in the tray it gives unused memory back to Windows, so Task Manager typically shows 10–40 MB.
 - **Local and private.** All data is one SQLite file plus PNGs in `%AppData%\QuickStash`. There's no account, network access or telemetry.
 
@@ -37,6 +48,7 @@ To start QuickStash automatically, enable **Start with Windows** in Settings.
 |---|---|---|
 | Anywhere | `Ctrl+Shift+Space` | Open / close the overlay (configurable) |
 | Anywhere | `Ctrl+Shift+P` | Unpin all pinned notes (configurable) |
+| Anywhere | `Ctrl+PrintScreen` | Quick capture: screenshot the game into its topic (configurable) |
 | Overlay | `Esc` | Close the viewer, editor or search first, then the overlay |
 | Note box | `Enter` / `Shift+Enter` | Save note / new line |
 | Note box | `Ctrl+V` | Paste an image from the clipboard as the attachment |
@@ -44,7 +56,20 @@ To start QuickStash automatically, enable **Start with Windows** in Settings.
 | Overlay | `Ctrl+T` | Filter topics (`↑` `↓` to move, `Enter` to open) |
 | Overlay | `Ctrl+N` | New topic |
 
-Clicking a note expands it. Clicking a thumbnail shows the image full size. Hover a note to pin, edit or delete it.
+Clicking a note expands it. Clicking a thumbnail shows the image full size. Hover a note to pin, draw on, edit or delete it.
+
+In the drawing editor: `P` pen, `H` highlighter, `A` arrow, `E` eraser, `1`–`6` colors, `[` `]` size, `Ctrl+Z` / `Ctrl+Y` undo/redo, `Ctrl+S` save, `Esc` cancel. Esc warns first if there are unsaved strokes.
+
+> **Hotkeys are global.** While QuickStash runs, its combinations are taken away from every other app. For example, `Ctrl+Shift+P` is also VS Code's command palette. Change any of them in **Settings**.
+
+### Second monitor
+
+Open the **Companion window** from the tray menu or with the window button in the overlay's header. Leave it on your other screen:
+- **Follow the game** (gamepad icon, on by default) switches it to the game's topic when you tab back into the game.
+- **Capture game** grabs the game you were just playing, even though you clicked in the companion window.
+- The pin icon keeps it on top.
+
+Size, position and whether it was open are remembered.
 
 ### Borderless windowed mode required
 
@@ -66,7 +91,8 @@ Everything lives in `%AppData%\QuickStash`:
 | File | Contents |
 |---|---|
 | `quickstash.db` | SQLite database (topics, process links, notes, pin positions) |
-| `images\*.png` | Attached screenshots and pasted images |
+| `images\*.png` | Attached screenshots, pasted images, and flattened drawings |
+| `images\*.isf` | Drawing strokes (Ink Serialized Format), so drawings stay editable |
 | `settings.json` | Settings (hand-editable) |
 | `quickstash.log` | Small diagnostic log, trimmed automatically |
 
@@ -99,7 +125,8 @@ src/QuickStash/
   Services/                Overlay lifecycle, hotkeys, tray icon, capture, images, pins, settings, startup, log
   ViewModels/              OverlayViewModel, NoteItemViewModel, TopicItemViewModel, SearchResultViewModel,
                            PinnedNoteViewModel, SettingsViewModel (CommunityToolkit.Mvvm)
-  Views/                   OverlayWindow, PinnedNoteWindow, SettingsWindow, HotkeyBox, attached behaviors
+  Views/                   NotesView (shared topics/notes/search UI), OverlayWindow, CompanionWindow, AnnotationWindow,
+                           PinnedNoteWindow, ToastWindow, SettingsWindow, HotkeyBox, attached behaviors
   Themes/Dark.xaml         Steam-like dark theme (colors, controls, scrollbars, menus)
 tests/QuickStash.Tests/    xUnit tests for storage, search, hotkey parsing
 ```
@@ -128,7 +155,8 @@ Typical timings on a desktop PC are about 15 ms for the capture and 30–90 ms f
 ```
 Topics         (Id, Name UNIQUE NOCASE, LastUsed)
 TopicProcesses (TopicId → Topics ON DELETE CASCADE, ProcessName)   -- PK (TopicId, ProcessName)
-Notes          (Id, TopicId → Topics ON DELETE CASCADE, Text, ImagePath, IsPinned, PinX, PinY, CreatedAt, UpdatedAt)
+Notes          (Id, TopicId → Topics ON DELETE CASCADE, Text, ImagePath, IsPinned, PinX, PinY, CreatedAt, UpdatedAt,
+                OriginalImagePath, AnnotationPath, PinWidth)                        -- v2
 ```
 
 Timestamps are ISO-8601 UTC. `ImagePath` is relative to the data folder. Search uses a small custom SQL function, `qs_match`, that requires every word of the query to appear in the note text, ignoring case. Unlike SQLite's built-in `LIKE`, it handles Unicode case (Ö/ö), and characters such as `%` and `_` are matched literally.
@@ -147,4 +175,6 @@ There's no Electron, web view or WinForms.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+QuickStash is free software under the [GNU General Public License v3.0](LICENSE). You may use, study, modify and share it, including in paid products, as long as anything you distribute that is based on it is also released under GPLv3 with its source code.
+
+Copyright (C) 2026 Bibi. If you publish a modified version, please give it a different name so it isn't confused with QuickStash.

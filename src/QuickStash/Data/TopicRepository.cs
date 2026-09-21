@@ -61,14 +61,36 @@ internal sealed class TopicRepository
         _db.Execute("UPDATE Topics SET Name = @name WHERE Id = @id", ("@name", name), ("@id", id));
     }
 
-    /// <summary>Deletes the topic and (by cascade) its notes. Returns the image paths those notes referenced so files can be removed.</summary>
+    /// <summary>Deletes the topic and (by cascade) its notes. Returns the files those notes owned so they can be removed.</summary>
     public List<string> Delete(long id)
     {
-        var images = _db.Query("SELECT ImagePath FROM Notes WHERE TopicId = @id AND ImagePath IS NOT NULL",
-            r => r.GetString(0), ("@id", id));
+        var files = _db.Query("SELECT ImagePath, OriginalImagePath, AnnotationPath FROM Notes WHERE TopicId = @id",
+                r => new[] { r.IsDBNull(0) ? null : r.GetString(0), r.IsDBNull(1) ? null : r.GetString(1), r.IsDBNull(2) ? null : r.GetString(2) },
+                ("@id", id))
+            .SelectMany(paths => paths)
+            .OfType<string>()
+            .ToList();
         _db.Execute("DELETE FROM Topics WHERE Id = @id", ("@id", id));
-        return images;
+        return files;
     }
+
+    /// <summary>The topic linked to the process, creating (and linking) one named after the executable if there is none.</summary>
+    public Topic GetOrCreateForProcess(string processName)
+    {
+        if (FindByProcess(processName) is { } linked) return linked;
+        string name = processName.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? processName[..^4] : processName;
+        if (FindByName(name) is { } existing)
+        {
+            LinkProcess(existing.Id, processName);
+            return Get(existing.Id)!;
+        }
+        return Create(name, processName);
+    }
+
+    /// <summary>The catch-all topic for captures made when no game was in front.</summary>
+    public Topic GetOrCreateInbox() => FindByName(InboxName) ?? Create(InboxName);
+
+    public const string InboxName = "Inbox";
 
     /// <summary>Marks the topic as just used so it moves to the top of the recent list.</summary>
     public void Touch(long id) =>

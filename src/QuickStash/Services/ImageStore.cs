@@ -38,10 +38,40 @@ internal sealed class ImageStore
         return relative;
     }
 
+    /// <summary>Saves ink strokes (Ink Serialized Format) next to the images. Returns the relative path.</summary>
+    public string SaveStrokes(System.Windows.Ink.StrokeCollection strokes)
+    {
+        string relative = Path.Combine(ImagesFolderName, $"{DateTime.Now:yyyyMMdd-HHmmss}-{Guid.NewGuid().ToString("N")[..8]}.isf");
+        using var stream = File.Create(Path.Combine(_dataFolder, relative));
+        strokes.Save(stream, compress: true);
+        return relative;
+    }
+
+    /// <summary>Loads saved ink strokes, or an empty collection if the file is missing or unreadable.</summary>
+    public System.Windows.Ink.StrokeCollection LoadStrokes(string? path)
+    {
+        if (string.IsNullOrEmpty(path) || !File.Exists(Resolve(path))) return new();
+        try
+        {
+            using var stream = File.OpenRead(Resolve(path));
+            return new System.Windows.Ink.StrokeCollection(stream);
+        }
+        catch (Exception ex) when (ex is IOException or ArgumentException or UnauthorizedAccessException)
+        {
+            Log.Error($"Could not load strokes {path}", ex);
+            return new();
+        }
+    }
+
     /// <summary>Absolute path for a stored (relative or absolute) path.</summary>
     public string Resolve(string path) => Path.IsPathRooted(path) ? path : Path.Combine(_dataFolder, path);
 
     public bool Exists(string? path) => path is not null && File.Exists(Resolve(path));
+
+    public void Delete(IEnumerable<string> paths)
+    {
+        foreach (var path in paths) Delete(path);
+    }
 
     /// <summary>Deletes an image file. Only files inside the images folder are ever deleted.</summary>
     public void Delete(string? path)
@@ -55,6 +85,21 @@ internal sealed class ImageStore
         }
         catch (IOException ex) { Log.Error($"Could not delete {full}", ex); }
         catch (UnauthorizedAccessException ex) { Log.Error($"Could not delete {full}", ex); }
+    }
+
+    /// <summary>Pixel width from the file header only (no full decode); int.MaxValue if unknown.</summary>
+    private static int GetPixelWidth(string fullPath)
+    {
+        try
+        {
+            using var stream = File.OpenRead(fullPath);
+            var decoder = BitmapDecoder.Create(stream, BitmapCreateOptions.DelayCreation | BitmapCreateOptions.IgnoreColorProfile, BitmapCacheOption.None);
+            return decoder.Frames[0].PixelWidth;
+        }
+        catch (Exception ex) when (ex is IOException or NotSupportedException or FileFormatException or UnauthorizedAccessException)
+        {
+            return int.MaxValue;
+        }
     }
 
     /// <summary>
@@ -73,7 +118,8 @@ internal sealed class ImageStore
             bitmap.CacheOption = BitmapCacheOption.OnLoad;
             bitmap.CreateOptions = BitmapCreateOptions.IgnoreColorProfile;
             bitmap.UriSource = new Uri(full, UriKind.Absolute);
-            if (decodePixelWidth > 0) bitmap.DecodePixelWidth = decodePixelWidth;
+            // Downscale while decoding (cheap thumbnails), but never upscale a small image.
+            if (decodePixelWidth > 0 && decodePixelWidth < GetPixelWidth(full)) bitmap.DecodePixelWidth = decodePixelWidth;
             bitmap.EndInit();
             bitmap.Freeze();
             return bitmap;

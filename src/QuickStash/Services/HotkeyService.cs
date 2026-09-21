@@ -8,6 +8,7 @@ internal sealed class HotkeyService : IDisposable
 {
     public const int OverlayHotkeyId = 1;
     public const int UnpinAllHotkeyId = 2;
+    public const int CaptureHotkeyId = 3;
 
     private readonly IntPtr _hwnd;
     private readonly Dictionary<int, Action> _handlers = new();

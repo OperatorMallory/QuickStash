@@ -269,6 +269,34 @@ internal static class NativeMethods
     [return: MarshalAs(UnmanagedType.Bool)]
     public static extern bool SetWindowDisplayAffinity(IntPtr hWnd, uint dwAffinity);
 
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    public static extern bool GetWindowDisplayAffinity(IntPtr hWnd, out uint pdwAffinity);
+
+    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    /// <summary>All visible top-level windows of this process, including popups such as tooltips and menus.</summary>
+    public static List<IntPtr> GetOwnVisibleWindows()
+    {
+        var result = new List<IntPtr>();
+        uint self = (uint)Environment.ProcessId;
+        EnumWindows((hwnd, _) =>
+        {
+            GetWindowThreadProcessId(hwnd, out uint pid);
+            if (pid == self && IsWindowVisible(hwnd)) result.Add(hwnd);
+            return true;
+        }, IntPtr.Zero);
+        return result;
+    }
+
+    /// <summary>Waits until the desktop compositor has presented the next frame (so affinity/visibility changes are on screen).</summary>
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmFlush();
+
     // ───────────────────────────── Foreground change events ─────────────────────────────
 
     public const uint EVENT_SYSTEM_FOREGROUND = 0x0003;

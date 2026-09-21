@@ -131,6 +131,9 @@ public sealed partial class NoteItemViewModel : ObservableObject
     private void TogglePin() => _owner.TogglePin(this);
 
     [RelayCommand]
+    private void Draw() => _owner.RequestDraw(this);
+
+    [RelayCommand]
     private Task OpenImage() => _owner.OpenImageAsync(ImagePath);
 
     /// <summary>Leaves any inline mode (edit / delete confirmation). Returns true if there was one.</summary>

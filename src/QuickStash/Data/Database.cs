@@ -9,7 +9,7 @@ namespace QuickStash.Data;
 /// </summary>
 internal sealed class Database : IDisposable
 {
-    public const int SchemaVersion = 1;
+    public const int SchemaVersion = 2;
 
     public SqliteConnection Connection { get; }
 
@@ -66,6 +66,15 @@ internal sealed class Database : IDisposable
                 );
                 CREATE INDEX IX_Notes_Topic_Created ON Notes(TopicId, CreatedAt DESC);
                 CREATE INDEX IX_Notes_Pinned ON Notes(IsPinned) WHERE IsPinned = 1;
+                """, tx);
+        }
+        if (version < 2)
+        {
+            // v2: drawings on screenshots (original kept, strokes kept for re-editing) and resizable pinned notes.
+            Execute("""
+                ALTER TABLE Notes ADD COLUMN OriginalImagePath TEXT NULL;
+                ALTER TABLE Notes ADD COLUMN AnnotationPath TEXT NULL;
+                ALTER TABLE Notes ADD COLUMN PinWidth REAL NULL;
                 """, tx);
         }
         Execute($"PRAGMA user_version = {SchemaVersion};", tx);

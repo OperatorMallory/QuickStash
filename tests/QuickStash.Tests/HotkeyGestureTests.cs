@@ -11,6 +11,8 @@ public class HotkeyGestureTests
     [InlineData("Alt+F10", ModifierKeys.Alt, Key.F10)]
     [InlineData("Ctrl+Alt+5", ModifierKeys.Control | ModifierKeys.Alt, Key.D5)]
     [InlineData("Win+Shift+`", ModifierKeys.Windows | ModifierKeys.Shift, Key.OemTilde)]
+    [InlineData("Ctrl+PrintScreen", ModifierKeys.Control, Key.Snapshot)]
+    [InlineData("Ctrl+PrtSc", ModifierKeys.Control, Key.Snapshot)]
     public void Parses_valid_gestures(string text, ModifierKeys modifiers, Key key)
     {
         Assert.True(HotkeyGesture.TryParse(text, out var gesture));
@@ -32,7 +34,7 @@ public class HotkeyGestureTests
     [Fact]
     public void Round_trips_through_string()
     {
-        foreach (var gesture in new[] { HotkeyGesture.DefaultOverlay, HotkeyGesture.DefaultUnpinAll, new HotkeyGesture(ModifierKeys.Alt, Key.D1) })
+        foreach (var gesture in new[] { HotkeyGesture.DefaultOverlay, HotkeyGesture.DefaultUnpinAll, new HotkeyGesture(ModifierKeys.Alt, Key.D1), HotkeyGesture.DefaultCapture })
         {
             Assert.True(HotkeyGesture.TryParse(gesture.ToString(), out var parsed));
             Assert.Equal(gesture, parsed);

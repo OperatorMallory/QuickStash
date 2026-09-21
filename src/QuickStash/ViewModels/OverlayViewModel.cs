@@ -43,16 +43,33 @@ public sealed partial class OverlayViewModel : ObservableObject
     private readonly TopicRepository _topics;
     private readonly NoteRepository _notes;
     private readonly ImageStore _images;
+    private readonly DataChanges _changes;
     private readonly Dictionary<string, BitmapSource> _thumbnailCache = new(StringComparer.OrdinalIgnoreCase);
 
-    internal OverlayViewModel(TopicRepository topics, NoteRepository notes, ImageStore images)
+    internal OverlayViewModel(TopicRepository topics, NoteRepository notes, ImageStore images, DataChanges changes)
     {
         _topics = topics;
         _notes = notes;
         _images = images;
-        TopicsView = CollectionViewSource.GetDefaultView(Topics);
-        TopicsView.Filter = o => o is TopicItemViewModel t && t.Matches(TopicFilter);
+        _changes = changes;
+        TopicsView = new ListCollectionView(Topics) { Filter = o => o is TopicItemViewModel t && t.Matches(TopicFilter) };
+        _changes.Changed += OnExternalChange;
     }
+
+    /// <summary>
+    /// True while this panel is on screen. The overlay reloads everything when it opens, so it only needs live updates
+    /// while open; the companion window is always live.
+    /// </summary>
+    internal bool IsLive { get; set; }
+
+    /// <summary>Raised when the user wants to draw on a note's image.</summary>
+    public event EventHandler<Note>? DrawRequested;
+
+    /// <summary>Raised by the companion's capture button.</summary>
+    public event EventHandler? CaptureRequested;
+
+    /// <summary>Companion window: switch to the topic of whichever game comes to the front.</summary>
+    [ObservableProperty] private bool _followGame = true;
 
     internal IPinService? Pins { get; set; }
 
@@ -305,6 +322,7 @@ public sealed partial class OverlayViewModel : ObservableObject
         TopicFilter = string.Empty;
         ReloadTopics();
         SelectTopic(Topics.First(t => t.Id == topic.Id));
+        _changes.Raise(this, null);
     }
 
     [RelayCommand]
@@ -327,6 +345,7 @@ public sealed partial class OverlayViewModel : ObservableObject
         SelectedTopic.Topic.ProcessNames.Add(ProcessName);
         SelectedTopic.RefreshProcesses();
         OnPropertyChanged(nameof(CanLinkCurrentProcess));
+        _changes.Raise(this, null);
     }
 
     [RelayCommand]
@@ -337,6 +356,7 @@ public sealed partial class OverlayViewModel : ObservableObject
         SelectedTopic.Topic.ProcessNames.RemoveAll(p => string.Equals(p, processName, StringComparison.OrdinalIgnoreCase));
         SelectedTopic.RefreshProcesses();
         OnPropertyChanged(nameof(CanLinkCurrentProcess));
+        _changes.Raise(this, null);
     }
 
     [RelayCommand]
@@ -369,6 +389,7 @@ public sealed partial class OverlayViewModel : ObservableObject
         IsRenamingTopic = false;
         StatusMessage = null;
         TopicsView.Refresh();
+        _changes.Raise(this, null);
         FocusRequested?.Invoke(this, FocusTarget.NoteInput);
     }
 
@@ -394,8 +415,9 @@ public sealed partial class OverlayViewModel : ObservableObject
     {
         if (SelectedTopic is not { } topic) return;
         var noteIds = _notes.GetByTopic(topic.Id).Select(n => n.Id).ToList();
-        foreach (var image in _topics.Delete(topic.Id)) _images.Delete(image);
+        _images.Delete(_topics.Delete(topic.Id));
         foreach (var id in noteIds) Pins?.NoteDeleted(id);
+        _changes.Raise(this, null);
 
         IsConfirmingTopicDelete = false;
         Topics.Remove(topic);
@@ -429,6 +451,7 @@ public sealed partial class OverlayViewModel : ObservableObject
             _topics.Touch(topic.Id);
             if (SelectedTopic?.Id == topic.Id) Notes.Insert(0, new NoteItemViewModel(this, note));
             StatusMessage = null;
+            _changes.Raise(this, topic.Id);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or SqliteException)
         {
@@ -472,12 +495,13 @@ public sealed partial class OverlayViewModel : ObservableObject
         item.Text = text;
         if (item.HasImage && item.EditRemovesImage)
         {
-            _images.Delete(_notes.SetImage(item.Id, null));
+            _images.Delete(_notes.ClearImage(item.Id));
             item.OnImageRemoved();
         }
         item.IsEditing = false;
         StatusMessage = null;
         Pins?.NoteChanged(item.Note);
+        _changes.Raise(this, item.Note.TopicId);
         FocusRequested?.Invoke(this, FocusTarget.NoteInput);
     }
 
@@ -486,6 +510,7 @@ public sealed partial class OverlayViewModel : ObservableObject
         _images.Delete(_notes.Delete(item.Id));
         Pins?.NoteDeleted(item.Id);
         Notes.Remove(item);
+        _changes.Raise(this, item.Note.TopicId);
         FocusRequested?.Invoke(this, FocusTarget.NoteInput);
     }
 
@@ -537,6 +562,75 @@ public sealed partial class OverlayViewModel : ObservableObject
 
     [RelayCommand]
     private void OpenSettings() => SettingsRequested?.Invoke(this, EventArgs.Empty);
+
+    // ───────────────────────── Shared data / companion ─────────────────────────
+
+    /// <summary>Another panel (or a quick capture) changed data: refresh what this panel shows, keeping the selection.</summary>
+    private void OnExternalChange(object? sender, long? topicId)
+    {
+        if (ReferenceEquals(sender, this) || !IsLive) return;
+
+        long? selectedId = SelectedTopic?.Id;
+        ReloadTopics();
+        SelectedTopic = selectedId is long id ? Topics.FirstOrDefault(t => t.Id == id) : null;
+        OnPropertyChanged(nameof(CanLinkCurrentProcess));
+
+        if (SelectedTopic is null)
+        {
+            if (Page == OverlayPage.Topic)
+            {
+                Notes.Clear();
+                if (Topics.Count > 0) SelectTopic(Topics[0]);
+                else ShowNewTopic(string.Empty);
+            }
+            return;
+        }
+        if (topicId is null || topicId == SelectedTopic.Id) ReloadNotesKeepingState();
+        if (Page == OverlayPage.Search && !string.IsNullOrWhiteSpace(SearchText)) RunSearch(SearchText);
+    }
+
+    /// <summary>Reloads the current topic's notes without losing expanded cards or an edit in progress.</summary>
+    private void ReloadNotesKeepingState()
+    {
+        if (SelectedTopic is null || Notes.Any(n => n.IsEditing || n.IsConfirmingDelete)) return;
+        var expanded = Notes.Where(n => n.IsExpanded).Select(n => n.Id).ToHashSet();
+        LoadNotes(SelectedTopic.Id);
+        foreach (var note in Notes) note.IsExpanded = expanded.Contains(note.Id);
+    }
+
+    /// <summary>
+    /// Companion window: another program came to the front. Show which one and, when following, switch to its topic,
+    /// unless the user is in the middle of something here.
+    /// </summary>
+    internal void Follow(ForegroundInfo foreground)
+    {
+        if (foreground.ProcessName is null) return;
+        ProcessName = foreground.ProcessName;
+        OnPropertyChanged(nameof(CanLinkCurrentProcess));
+        if (!FollowGame || Page != OverlayPage.Topic || DraftText.Length > 0 || Notes.Any(n => n.IsEditing)) return;
+
+        var linked = Topics.FirstOrDefault(t => t.IsLinkedTo(foreground.ProcessName));
+        if (linked is not null && linked.Id != SelectedTopic?.Id) SelectTopic(linked);
+    }
+
+    /// <summary>Companion window: first fill, showing the linked topic of the last game if known.</summary>
+    internal void Initialize(ForegroundInfo lastGame)
+    {
+        ReloadTopics();
+        var linked = lastGame.ProcessName is null ? null : Topics.FirstOrDefault(t => t.IsLinkedTo(lastGame.ProcessName));
+        ProcessName = lastGame.ProcessName;
+        if (linked is not null) SelectTopic(linked);
+        else if (Topics.Count > 0) SelectTopic(Topics[0]);
+        else ShowNewTopic(string.Empty);
+    }
+
+    [RelayCommand]
+    private void Capture() => CaptureRequested?.Invoke(this, EventArgs.Empty);
+
+    internal void RequestDraw(NoteItemViewModel item)
+    {
+        if (item.HasImage) DrawRequested?.Invoke(this, item.Note);
+    }
 
     // ───────────────────────── Global search ─────────────────────────
 

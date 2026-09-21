@@ -92,10 +92,10 @@ public class StorageTests
         Assert.Equal("Bear cave (cleared)", updated.Text);
         Assert.True(updated.UpdatedAt >= updated.CreatedAt);
 
-        Assert.Equal(@"images\a.png", folder.Notes.SetImage(n2.Id, null));
+        Assert.Equal(new[] { @"images\a.png" }, folder.Notes.ClearImage(n2.Id));
         Assert.Null(folder.Notes.Get(n2.Id)!.ImagePath);
 
-        Assert.Null(folder.Notes.Delete(n1.Id));
+        Assert.Empty(folder.Notes.Delete(n1.Id));
         Assert.Single(folder.Notes.GetByTopic(topic.Id));
     }
 

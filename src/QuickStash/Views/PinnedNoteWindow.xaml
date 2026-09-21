@@ -6,7 +6,7 @@
         xmlns:vm="clr-namespace:QuickStash.ViewModels"
         mc:Ignorable="d" d:DataContext="{d:DesignInstance vm:PinnedNoteViewModel}"
         Title="QuickStash pinned note"
-        Width="280" SizeToContent="Height" MaxHeight="440"
+        Width="280" MinWidth="180" SizeToContent="Height"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" ShowInTaskbar="False" Topmost="True" ShowActivated="False"
         WindowStartupLocation="Manual"
@@ -29,10 +29,16 @@
                        Visibility="{Binding Text, Converter={StaticResource NullToVisibility}}" />
             <Border Margin="0,7,0,0" CornerRadius="3" ClipToBounds="True" HorizontalAlignment="Left"
                     Visibility="{Binding Image, Converter={StaticResource NullToVisibility}}">
-                <Image Source="{Binding Image}" MaxWidth="258" MaxHeight="150" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                <Image Source="{Binding Image}" Stretch="Uniform" StretchDirection="DownOnly" RenderOptions.BitmapScalingMode="HighQuality" />
             </Border>
-            <TextBlock Text="Drag to move  ·  closes to click-through" FontSize="10" Foreground="{StaticResource TextFaintBrush}" Margin="0,6,0,0"
-                       Visibility="{Binding IsInteractive, Converter={StaticResource BoolToVisibility}}" />
+            <DockPanel Margin="0,6,-6,-6" Visibility="{Binding IsInteractive, Converter={StaticResource BoolToVisibility}}">
+                <!-- Resize grip (bottom-right): changes the width; height follows the content -->
+                <Border x:Name="ResizeGrip" DockPanel.Dock="Right" Width="16" Height="16" Background="Transparent" Cursor="SizeWE"
+                        ToolTip="Drag to resize">
+                    <Path Data="M 12,4 L 4,12 M 12,8 L 8,12" Stroke="{StaticResource TextDimBrush}" StrokeThickness="1.2" />
+                </Border>
+                <TextBlock Text="Drag to move  ·  closes to click-through" FontSize="10" Foreground="{StaticResource TextFaintBrush}" VerticalAlignment="Center" />
+            </DockPanel>
         </StackPanel>
     </Border>
 </Window>

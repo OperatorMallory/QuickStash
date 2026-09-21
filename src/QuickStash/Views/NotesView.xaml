@@ -1,0 +1,419 @@
+<UserControl x:Class="QuickStash.Views.NotesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="clr-namespace:QuickStash.ViewModels"
+             xmlns:local="clr-namespace:QuickStash.Views"
+             xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
+             mc:Ignorable="d" d:DataContext="{d:DesignInstance vm:OverlayViewModel}"
+             d:DesignWidth="760" d:DesignHeight="540">
+    <!-- The topics + notes + search UI, shared by the overlay and the companion window. -->
+    <UserControl.Resources>
+        <!-- ───────── Note card ───────── -->
+        <DataTemplate x:Key="NoteCardTemplate" DataType="{x:Type vm:NoteItemViewModel}">
+            <Border x:Name="Card" Background="{StaticResource PanelBrush}" CornerRadius="4" Margin="0,0,4,6" Padding="10,8"
+                    BorderThickness="1" BorderBrush="Transparent">
+                <StackPanel>
+                    <!-- Header row: click to expand -->
+                    <Grid Background="Transparent" Cursor="Hand">
+                        <Grid.InputBindings>
+                            <MouseBinding MouseAction="LeftClick" Command="{Binding ToggleExpandedCommand}" />
+                        </Grid.InputBindings>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Width="64" Height="36" CornerRadius="3" Margin="0,0,10,0" Background="{StaticResource InputBrush}"
+                                BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" ClipToBounds="True"
+                                Visibility="{Binding HasImage, Converter={StaticResource BoolToVisibility}}"
+                                ToolTip="Open image">
+                            <Border.InputBindings>
+                                <MouseBinding MouseAction="LeftClick" Command="{Binding OpenImageCommand}" />
+                            </Border.InputBindings>
+                            <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Border>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                            <TextBlock x:Name="TitleText" Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            <StackPanel Orientation="Horizontal" Margin="0,1,0,0">
+                                <TextBlock Style="{StaticResource DimText}" Text="{Binding CreatedAt, Converter={StaticResource RelativeTime}}" />
+                                <TextBlock Style="{StaticResource DimText}" Text="  ·  pinned" Foreground="{StaticResource AccentBrush}"
+                                           Visibility="{Binding IsPinned, Converter={StaticResource BoolToVisibility}}" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel x:Name="Actions" Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Margin="6,0,0,0" Visibility="Hidden">
+                            <ToggleButton Style="{StaticResource IconToggle}" IsChecked="{Binding IsPinned, Mode=OneWay}"
+                                          Command="{Binding TogglePinCommand}" Content="&#xE718;" ToolTip="Pin on top of the game" />
+                            <Button Style="{StaticResource IconButton}" Command="{Binding DrawCommand}" Content="&#xE771;" ToolTip="Draw on the image"
+                                    Visibility="{Binding HasImage, Converter={StaticResource BoolToVisibility}}" />
+                            <Button Style="{StaticResource IconButton}" Command="{Binding BeginEditCommand}" Content="&#xE70F;" ToolTip="Edit" />
+                            <Button Style="{StaticResource DangerIconButton}" Command="{Binding RequestDeleteCommand}" Content="&#xE74D;" ToolTip="Delete" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Expanded: full text (selectable) -->
+                    <TextBox Style="{StaticResource ReadOnlyText}" Text="{Binding Text, Mode=OneWay}" Margin="0,8,0,0"
+                             Visibility="{Binding ShowBody, Converter={StaticResource BoolToVisibility}}" />
+
+                    <!-- Inline editor -->
+                    <StackPanel Margin="0,8,0,0" Visibility="{Binding IsEditing, Converter={StaticResource BoolToVisibility}}">
+                        <TextBox Text="{Binding EditText, UpdateSourceTrigger=PropertyChanged}" AcceptsReturn="True" TextWrapping="Wrap"
+                                 MinHeight="56" MaxHeight="160" VerticalScrollBarVisibility="Auto"
+                                 local:FocusBehavior.FocusWhenVisible="True"
+                                 local:TextBoxBehavior.EnterCommand="{Binding SaveEditCommand}"
+                                 local:TextBoxBehavior.EscapeCommand="{Binding CancelEditCommand}" />
+                        <DockPanel Margin="0,6,0,0">
+                            <CheckBox Content="Remove image" IsChecked="{Binding EditRemovesImage}" VerticalAlignment="Center"
+                                      Visibility="{Binding HasImage, Converter={StaticResource BoolToVisibility}}" />
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Button Content="Cancel" Command="{Binding CancelEditCommand}" Margin="0,0,6,0" />
+                                <Button Style="{StaticResource AccentButton}" Content="Save" Command="{Binding SaveEditCommand}" />
+                            </StackPanel>
+                        </DockPanel>
+                    </StackPanel>
+
+                    <!-- Delete confirmation -->
+                    <DockPanel Margin="0,8,0,0" Visibility="{Binding IsConfirmingDelete, Converter={StaticResource BoolToVisibility}}">
+                        <TextBlock Text="Delete this note?" VerticalAlignment="Center" Foreground="{StaticResource DangerBrush}" />
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                            <Button Content="Cancel" Command="{Binding CancelDeleteCommand}" Margin="0,0,6,0" />
+                            <Button Style="{StaticResource DangerButton}" Content="Delete" Command="{Binding ConfirmDeleteCommand}" />
+                        </StackPanel>
+                    </DockPanel>
+                </StackPanel>
+            </Border>
+            <DataTemplate.Triggers>
+                <DataTrigger Binding="{Binding ShowActions}" Value="True">
+                    <Setter TargetName="Actions" Property="Visibility" Value="Visible" />
+                </DataTrigger>
+                <Trigger SourceName="Card" Property="IsMouseOver" Value="True">
+                    <Setter TargetName="Actions" Property="Visibility" Value="Visible" />
+                    <Setter TargetName="Card" Property="BorderBrush" Value="#3A4450" />
+                </Trigger>
+                <DataTrigger Binding="{Binding IsExpanded}" Value="True">
+                    <Setter TargetName="Card" Property="BorderBrush" Value="#2C5F8A" />
+                    <Setter TargetName="Card" Property="Background" Value="{StaticResource PanelAltBrush}" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding HasTitle}" Value="False">
+                    <Setter TargetName="TitleText" Property="FontStyle" Value="Italic" />
+                    <Setter TargetName="TitleText" Property="Foreground" Value="{StaticResource TextDimBrush}" />
+                </DataTrigger>
+            </DataTemplate.Triggers>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="42" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="214" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- ───────── Header ───────── -->
+        <Border Grid.ColumnSpan="2" Background="{StaticResource PanelBrush}" CornerRadius="8,8,0,0"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
+            <Grid Margin="14,0,8,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="QUICKSTASH" FontWeight="Bold" FontSize="12" Foreground="{StaticResource AccentBrush}" VerticalAlignment="Center" />
+                    <Border Margin="12,0,0,0" Padding="7,2" CornerRadius="3" Background="{StaticResource PanelAltBrush}"
+                            BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                            Visibility="{Binding ProcessName, Converter={StaticResource NullToVisibility}}"
+                            ToolTip="The game this panel is following">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource IconGlyph}" Text="&#xE7FC;" FontSize="10" Foreground="{StaticResource TextDimBrush}" Margin="0,0,5,0" />
+                            <TextBlock Text="{Binding ProcessName}" FontSize="11" Foreground="{StaticResource TextDimBrush}" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Grid Width="240" Margin="0,0,8,0" shell:WindowChrome.IsHitTestVisibleInChrome="True">
+                        <TextBox x:Name="SearchBox" Tag="Search all notes  (Ctrl+F)" FontSize="12" Padding="26,4,7,4"
+                                 VerticalContentAlignment="Center"
+                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"
+                                 local:TextBoxBehavior.EnterCommand="{Binding OpenFirstSearchResultCommand}"
+                                 PreviewKeyDown="OnSearchBoxKeyDown" />
+                        <TextBlock Style="{StaticResource IconGlyph}" Text="&#xE721;" FontSize="11" HorizontalAlignment="Left" Margin="9,0,0,0"
+                                   Foreground="{StaticResource TextFaintBrush}" IsHitTestVisible="False" />
+                    </Grid>
+                    <ContentPresenter Content="{Binding HeaderContent, RelativeSource={RelativeSource AncestorType=local:NotesView}}"
+                                      shell:WindowChrome.IsHitTestVisibleInChrome="True" VerticalAlignment="Center" />
+                    <Button Style="{StaticResource IconButton}" Content="&#xE713;" ToolTip="Settings" Command="{Binding OpenSettingsCommand}"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True" />
+                    <ContentPresenter Content="{Binding TrailingHeaderContent, RelativeSource={RelativeSource AncestorType=local:NotesView}}"
+                                      shell:WindowChrome.IsHitTestVisibleInChrome="True" VerticalAlignment="Center" />
+                    <Button Style="{StaticResource IconButton}" Content="&#xE711;" ToolTip="{Binding CloseToolTip, RelativeSource={RelativeSource AncestorType=local:NotesView}}"
+                            Click="OnCloseClick" shell:WindowChrome.IsHitTestVisibleInChrome="True" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ───────── Left: topics ───────── -->
+        <Border Grid.Row="1" Background="{StaticResource PanelBrush}" CornerRadius="0,0,0,8"
+                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0">
+            <DockPanel Margin="10,10,10,10">
+                <TextBox x:Name="TopicFilterBox" DockPanel.Dock="Top" Tag="Filter topics  (Ctrl+T)" FontSize="12.5"
+                         Text="{Binding TopicFilter, UpdateSourceTrigger=PropertyChanged}"
+                         PreviewKeyDown="OnTopicFilterKeyDown" TextChanged="OnTopicFilterTextChanged" />
+                <TextBlock DockPanel.Dock="Top" Style="{StaticResource SectionHeader}" Text="RECENT TOPICS" Margin="2,12,0,6" />
+                <Button DockPanel.Dock="Bottom" Margin="0,8,0,0" HorizontalAlignment="Stretch" Command="{Binding NewTopicCommand}"
+                        ToolTip="Ctrl+N">
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Style="{StaticResource IconGlyph}" Text="&#xE710;" FontSize="10" Margin="0,0,6,0" />
+                        <TextBlock Text="New topic" />
+                    </StackPanel>
+                </Button>
+                <Grid>
+                    <ListBox x:Name="TopicList" ItemsSource="{Binding TopicsView}" SelectedItem="{Binding SelectedTopic, Mode=OneWay}"
+                             PreviewMouseLeftButtonUp="OnTopicListClick" KeyDown="OnTopicListKeyDown"
+                             VirtualizingPanel.IsVirtualizing="True">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate DataType="{x:Type vm:TopicItemViewModel}">
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="{Binding ProcessSummary}" FontSize="10.5" Foreground="{StaticResource TextFaintBrush}"
+                                               TextTrimming="CharacterEllipsis"
+                                               Visibility="{Binding ProcessSummary, Converter={StaticResource NullToVisibility}}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock Text="No topics yet" Style="{StaticResource DimText}" Margin="4,2,0,0">
+                        <TextBlock.Visibility>
+                            <Binding Path="Topics.Count" Converter="{StaticResource ZeroToVisibility}" />
+                        </TextBlock.Visibility>
+                    </TextBlock>
+                </Grid>
+            </DockPanel>
+        </Border>
+
+        <!-- ───────── Right: topic page ───────── -->
+        <Grid Grid.Row="1" Grid.Column="1" Margin="14,12,10,10"
+              Visibility="{Binding IsTopicPage, Converter={StaticResource BoolToVisibility}}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Topic header -->
+            <DockPanel Margin="0,0,4,8">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Style="{StaticResource LinkButton}" Command="{Binding LinkCurrentProcessCommand}"
+                            Visibility="{Binding CanLinkCurrentProcess, Converter={StaticResource BoolToVisibility}}"
+                            ToolTip="Open this topic automatically when this program is in front">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Style="{StaticResource IconGlyph}" Text="&#xE71B;" FontSize="11" Margin="0,0,5,0" />
+                            <TextBlock>
+                                <Run Text="Link" /> <Run Text="{Binding ProcessName, Mode=OneWay}" />
+                            </TextBlock>
+                        </StackPanel>
+                    </Button>
+                    <Button Style="{StaticResource IconButton}" Content="&#xE712;" ToolTip="Topic options" Click="OnTopicMenuClick">
+                        <Button.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Rename topic" Command="{Binding BeginRenameTopicCommand}" />
+                                <MenuItem Header="Delete topic…" Command="{Binding RequestDeleteTopicCommand}" />
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+                </StackPanel>
+
+                <StackPanel>
+                    <Grid>
+                        <TextBlock Text="{Binding SelectedTopic.Name}" FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"
+                                   Visibility="{Binding IsRenamingTopic, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}" />
+                        <TextBox Text="{Binding RenameText, UpdateSourceTrigger=PropertyChanged}" FontSize="15" Padding="6,3"
+                                 Visibility="{Binding IsRenamingTopic, Converter={StaticResource BoolToVisibility}}"
+                                 local:FocusBehavior.FocusWhenVisible="True"
+                                 local:TextBoxBehavior.EnterCommand="{Binding CommitRenameTopicCommand}"
+                                 local:TextBoxBehavior.EscapeCommand="{Binding CancelRenameTopicCommand}" />
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding SelectedTopic.ProcessNames}" Margin="0,4,0,0">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource Chip}" ToolTip="This topic opens automatically for this program">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="{Binding}" FontSize="10.5" Foreground="{StaticResource TextDimBrush}" VerticalAlignment="Center" />
+                                        <Button Style="{StaticResource IconButton}" Width="16" Height="16" FontSize="8" Margin="3,0,0,0" Content="&#xE711;"
+                                                ToolTip="Unlink"
+                                                Command="{Binding DataContext.UnlinkProcessCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </DockPanel>
+
+            <!-- Delete-topic confirmation -->
+            <Border Grid.Row="1" Background="#26E5484D" BorderBrush="{StaticResource DangerBrush}" BorderThickness="1" CornerRadius="4"
+                    Padding="10,7" Margin="0,0,4,8"
+                    Visibility="{Binding IsConfirmingTopicDelete, Converter={StaticResource BoolToVisibility}}">
+                <DockPanel>
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <Button Content="Cancel" Command="{Binding CancelDeleteTopicCommand}" Margin="0,0,6,0" />
+                        <Button Style="{StaticResource DangerButton}" Content="Delete topic" Command="{Binding ConfirmDeleteTopicCommand}" />
+                    </StackPanel>
+                    <TextBlock VerticalAlignment="Center" TextWrapping="Wrap">
+                        <Run Text="Delete" /> <Run Text="{Binding SelectedTopic.Name, Mode=OneWay}" FontWeight="SemiBold" /> <Run Text="and all its notes?" />
+                    </TextBlock>
+                </DockPanel>
+            </Border>
+
+            <!-- Note input -->
+            <Border Grid.Row="2" Background="{StaticResource InputBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="1"
+                    CornerRadius="4" Margin="0,0,4,0">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBox x:Name="NoteInput" Text="{Binding DraftText, UpdateSourceTrigger=PropertyChanged}"
+                             Tag="Write a note…" BorderThickness="0" Background="Transparent"
+                             AcceptsReturn="True" TextWrapping="Wrap" MinHeight="66" MaxHeight="150" VerticalScrollBarVisibility="Auto"
+                             local:TextBoxBehavior.EnterCommand="{Binding SaveNoteCommand}"
+                             local:TextBoxBehavior.PasteImageCommand="{Binding PasteImageCommand}" />
+
+                    <!-- Pending screenshot / pasted image -->
+                    <StackPanel Grid.Column="1" Margin="6,6,6,6" VerticalAlignment="Top"
+                                Visibility="{Binding PendingImage, Converter={StaticResource NullToVisibility}}">
+                        <Border x:Name="PendingThumb" Width="112" Height="63" CornerRadius="3" ClipToBounds="True" Cursor="Hand"
+                                BorderBrush="{StaticResource BorderBrush}" BorderThickness="1" ToolTip="View full size">
+                            <Border.InputBindings>
+                                <MouseBinding MouseAction="LeftClick" Command="{Binding ViewPendingImageCommand}" />
+                            </Border.InputBindings>
+                            <Image Source="{Binding PendingImage}" Stretch="UniformToFill" RenderOptions.BitmapScalingMode="HighQuality" />
+                        </Border>
+                        <CheckBox Margin="0,5,0,0" FontSize="11" IsChecked="{Binding AttachPendingImage}" Focusable="False"
+                                  ToolTip="Attach this image to the note">
+                            <TextBlock Text="Attach" />
+                        </CheckBox>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Hint + status -->
+            <DockPanel Grid.Row="3" Margin="2,5,4,10">
+                <TextBlock DockPanel.Dock="Right" Text="{Binding StatusMessage}" Foreground="#F0B429" FontSize="11" TextTrimming="CharacterEllipsis"
+                           Visibility="{Binding StatusMessage, Converter={StaticResource NullToVisibility}}" />
+                <TextBlock Style="{StaticResource DimText}" FontSize="10.5" Foreground="{StaticResource TextFaintBrush}" Text="{Binding DraftHint}" />
+            </DockPanel>
+
+            <!-- Notes -->
+            <Grid Grid.Row="4">
+                <ListBox x:Name="NotesList" ItemsSource="{Binding Notes}" ItemTemplate="{StaticResource NoteCardTemplate}"
+                         ItemContainerStyle="{StaticResource PlainItem}"
+                         VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                         VirtualizingPanel.ScrollUnit="Pixel" KeyboardNavigation.TabNavigation="Continue" />
+                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,24,0,0" Style="{StaticResource DimText}" FontSize="12"
+                           Text="No notes in this topic yet. Type above and press Enter.">
+                    <TextBlock.Visibility>
+                        <Binding Path="Notes.Count" Converter="{StaticResource ZeroToVisibility}" />
+                    </TextBlock.Visibility>
+                </TextBlock>
+            </Grid>
+        </Grid>
+
+        <!-- ───────── Right: new topic page ───────── -->
+        <Grid Grid.Row="1" Grid.Column="1" Margin="14,12,14,10"
+              Visibility="{Binding IsNewTopicPage, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Width="340" Margin="0,0,0,40">
+                <TextBlock Style="{StaticResource IconGlyph}" Text="&#xE8F4;" FontSize="28" Foreground="{StaticResource AccentBrush}" Margin="0,0,0,10" />
+                <TextBlock Text="{Binding NewTopicHeading}" FontSize="16" FontWeight="SemiBold" HorizontalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <TextBlock Style="{StaticResource DimText}" FontSize="12" HorizontalAlignment="Center" Margin="0,4,0,16" TextAlignment="Center" TextWrapping="Wrap"
+                           Text="Create a topic for your notes, or pick a recent one on the left." />
+                <TextBox x:Name="NewTopicNameBox" Text="{Binding NewTopicName, UpdateSourceTrigger=PropertyChanged}" Tag="Topic name"
+                         local:TextBoxBehavior.EnterCommand="{Binding CreateTopicCommand}" />
+                <CheckBox Margin="2,10,0,0" IsChecked="{Binding LinkNewTopicToProcess}"
+                          Visibility="{Binding ProcessName, Converter={StaticResource NullToVisibility}}">
+                    <TextBlock>
+                        <Run Text="Open automatically when" /> <Run Text="{Binding ProcessName, Mode=OneWay}" FontWeight="SemiBold" /> <Run Text="is in front" />
+                    </TextBlock>
+                </CheckBox>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,16,0,0">
+                    <Button Content="Cancel" Command="{Binding CancelNewTopicCommand}" Margin="0,0,6,0"
+                            Visibility="{Binding HasSelectedTopic, Converter={StaticResource BoolToVisibility}}" />
+                    <Button Style="{StaticResource AccentButton}" Content="Create topic" Command="{Binding CreateTopicCommand}" Padding="14,5" />
+                </StackPanel>
+                <TextBlock Text="{Binding StatusMessage}" Foreground="#F0B429" FontSize="11" Margin="0,10,0,0" HorizontalAlignment="Center"
+                           Visibility="{Binding StatusMessage, Converter={StaticResource NullToVisibility}}" />
+            </StackPanel>
+        </Grid>
+
+        <!-- ───────── Right: search page ───────── -->
+        <DockPanel Grid.Row="1" Grid.Column="1" Margin="14,12,10,10"
+                   Visibility="{Binding IsSearchPage, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel DockPanel.Dock="Top" Margin="0,0,4,10">
+                <TextBlock Text="Search" FontSize="18" FontWeight="SemiBold" />
+                <TextBlock Style="{StaticResource DimText}" FontSize="11.5" Margin="0,2,0,0">
+                    <Run Text="{Binding SearchSummary, Mode=OneWay}" /><Run Text="  ·  across all topics  ·  Enter opens the first result, Esc goes back" Foreground="{StaticResource TextFaintBrush}" />
+                </TextBlock>
+            </StackPanel>
+            <ListBox x:Name="SearchResultsList" ItemsSource="{Binding SearchResults}"
+                     VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.ScrollUnit="Pixel"
+                     PreviewMouseLeftButtonUp="OnSearchResultClick" KeyDown="OnSearchResultsKeyDown">
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem" BasedOn="{StaticResource {x:Type ListBoxItem}}">
+                        <Setter Property="Padding" Value="10,7" />
+                        <Setter Property="Margin" Value="0,0,4,4" />
+                        <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate DataType="{x:Type vm:SearchResultViewModel}">
+                        <StackPanel>
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Right" Style="{StaticResource DimText}" Margin="8,0,0,0"
+                                           Text="{Binding CreatedAt, Converter={StaticResource RelativeTime}}" />
+                                <Border DockPanel.Dock="Left" Style="{StaticResource Chip}" Padding="6,0" Margin="0,0,8,0" VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding TopicName}" FontSize="10.5" Foreground="{StaticResource AccentBrush}" />
+                                </Border>
+                                <TextBlock Style="{StaticResource IconGlyph}" DockPanel.Dock="Left" Text="&#xEB9F;" FontSize="11" Margin="0,0,6,0"
+                                           Foreground="{StaticResource TextDimBrush}" ToolTip="Has an image"
+                                           Visibility="{Binding HasImage, Converter={StaticResource BoolToVisibility}}" />
+                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                            </DockPanel>
+                            <TextBlock Margin="0,4,0,0" FontSize="12" Foreground="{StaticResource TextDimBrush}" TextTrimming="CharacterEllipsis">
+                                <Run Text="{Binding SnippetBefore, Mode=OneWay}" /><Run Text="{Binding SnippetMatch, Mode=OneWay}" Foreground="{StaticResource TextBrush}" Background="#401A9FFF" FontWeight="SemiBold" /><Run Text="{Binding SnippetAfter, Mode=OneWay}" />
+                            </TextBlock>
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
+
+        <!-- ───────── Full-size image viewer ───────── -->
+        <Border Grid.Row="1" Grid.ColumnSpan="2" Background="{StaticResource ScrimBrush}" CornerRadius="0,0,8,8" Cursor="Hand"
+                Visibility="{Binding ViewerImage, Converter={StaticResource NullToVisibility}}">
+            <Border.InputBindings>
+                <MouseBinding MouseAction="LeftClick" Command="{Binding CloseViewerCommand}" />
+            </Border.InputBindings>
+            <Grid Margin="14">
+                <Image Source="{Binding ViewerImage}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                <TextBlock Text="Click or press Esc to close" Style="{StaticResource DimText}" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                           Margin="0,0,0,-8" />
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

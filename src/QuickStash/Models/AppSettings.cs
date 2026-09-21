@@ -6,6 +6,9 @@ public sealed class AppSettings
     public string OverlayHotkey { get; set; } = HotkeyGesture.DefaultOverlay.ToString();
     public string UnpinAllHotkey { get; set; } = HotkeyGesture.DefaultUnpinAll.ToString();
 
+    /// <summary>Screenshot the game straight into its topic, without opening anything.</summary>
+    public string CaptureHotkey { get; set; } = HotkeyGesture.DefaultCapture.ToString();
+
     /// <summary>Opacity of the overlay window, 0.5–1.</summary>
     public double OverlayOpacity { get; set; } = 0.97;
 
@@ -19,6 +22,15 @@ public sealed class AppSettings
 
     /// <summary>Hide pinned notes from screenshots and screen recordings/streams (Windows 10 2004+).</summary>
     public bool HidePinnedFromCapture { get; set; } = true;
+
+    // Companion (second-monitor) window, remembered between sessions.
+    public bool CompanionOpen { get; set; }
+    public string? CompanionBounds { get; set; }
+    public bool CompanionTopmost { get; set; }
+    public bool CompanionFollowGame { get; set; } = true;
+
+    public HotkeyGesture GetCaptureHotkey() =>
+        HotkeyGesture.TryParse(CaptureHotkey, out var g) ? g : HotkeyGesture.DefaultCapture;
 
     public HotkeyGesture GetOverlayHotkey() =>
         HotkeyGesture.TryParse(OverlayHotkey, out var g) ? g : HotkeyGesture.DefaultOverlay;
@@ -35,5 +47,6 @@ public sealed class AppSettings
         PinnedOpacity = Math.Clamp(double.IsFinite(PinnedOpacity) ? PinnedOpacity : 0.85, 0.2, 1.0);
         if (!HotkeyGesture.TryParse(OverlayHotkey, out _)) OverlayHotkey = HotkeyGesture.DefaultOverlay.ToString();
         if (!HotkeyGesture.TryParse(UnpinAllHotkey, out _)) UnpinAllHotkey = HotkeyGesture.DefaultUnpinAll.ToString();
+        if (!HotkeyGesture.TryParse(CaptureHotkey, out _)) CaptureHotkey = HotkeyGesture.DefaultCapture.ToString();
     }
 }
