@@ -190,4 +190,4 @@ This program will not transfer any information to other networked systems unless
 
 QuickStash is free software under the [GNU General Public License v3.0](LICENSE). You may use, study, modify and share it, including in paid products, as long as anything you distribute that is based on it is also released under GPLv3 with its source code.
 
-Copyright (C) 2026 Bibi. If you publish a modified version, please give it a different name so it isn't confused with QuickStash.
+Copyright (C) 2026 OperatorMallory. If you publish a modified version, please give it a different name so it isn't confused with QuickStash.
